@@ -22,5 +22,7 @@ obj-$(CONFIG_IA32_EMULATION) += ia32/
 
 obj-y += platform/
 obj-y += net/
+obj-y += mpktracer/
 
 obj-$(CONFIG_KEXEC_FILE) += purgatory/
+
