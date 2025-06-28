@@ -6,9 +6,11 @@
 #include "linux/pgtable.h"
 #include <linux/vmalloc.h>
 
+
 #include "../../mm/pgalloc-track.h"
 #include "vmalloc_for_tramp.h"
 #include "../../mm/internal.h"
+#include "logging.h"
 
 #define UNSET_XD_BIT(X) (X & ~(1l << 63))
 #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
@@ -254,8 +256,10 @@ int vmap_page_range_for_trampoline(unsigned long addr, unsigned long end,
 				 ioremap_max_page_shift);
 	flush_cache_vmap(addr, end);
 	if (!err) {
+	TRACER_PRINT_DEBUG_TRAMPOLINES("got an error in vmap_page_range_for_tramp, %i", err);
 		err = kmsan_ioremap_page_range(addr, end, phys_addr, prot,
 					       ioremap_max_page_shift);
 	}
+	TRACER_PRINT_DEBUG_TRAMPOLINES("error in vmap_page_range_for_tramp, %i", err);
 	return err;
 }

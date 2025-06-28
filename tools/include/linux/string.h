@@ -14,9 +14,13 @@ int strtobool(const char *s, bool *res);
  * However uClibc headers also define __GLIBC__ hence the hack below
  */
 #if defined(__GLIBC__) && !defined(__UCLIBC__)
+// prevent compile error, taken from https://yhbt.net/lore/all/20200203161904.846921260@linuxfoundation.org/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wredundant-decls"
 extern size_t strlcpy(char *dest, const char *src, size_t size);
 #endif
 
+#pragma GCC diagnostic pop
 char *str_error_r(int errnum, char *buf, size_t buflen);
 
 /**

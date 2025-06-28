@@ -38,6 +38,44 @@ TraceAddresses *trace_addresses;
 	return address;
 }
 */
+
+
+/*static void log_mappings(struct mm_struct *mm) {
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *ptep;
+
+	pgd = pgd_offset(mm, address);
+	if (pgd_none(*pgd) || pgd_bad(*pgd)) {
+	//	return NULL;
+	}
+	p4d = p4d_offset(pgd, address);
+	if (p4d_none(*p4d) || p4d_bad(*p4d)) {
+	//	return NULL;
+	}
+	pud = pud_offset(p4d, address);
+	if (pud_none(*pud) || pud_bad(*pud)) {
+	//	return NULL;
+	}
+	pmd = pmd_offset(pud, address);
+
+	if (pmd_none(*pmd) || pmd_bad(*pmd)) {
+	//	return NULL;
+	}
+
+	ptep = pte_offset_kernel(pmd, address);
+	if (!ptep) {
+		//return NULL;
+	}
+	//return NULL;
+
+}
+
+
+}
+*/
 static pte_t __attribute__((__noinline__)) *
 	walk_page_table(struct mm_struct *mm, unsigned long address)
 {
@@ -383,6 +421,7 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px",
 		(void *)base_patch_address, (void *)valuebuffer,
 		(void *)tracebuffer);
+	enable_write_protection();
 }
 
 long get_tracebuffer_address(void)

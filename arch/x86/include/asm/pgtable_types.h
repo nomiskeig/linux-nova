@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0, adopted with relevant parts of the 6.15 kernel */
 #ifndef _ASM_X86_PGTABLE_DEFS_H
 #define _ASM_X86_PGTABLE_DEFS_H
 
@@ -546,6 +546,11 @@ enum pg_level {
 	PG_LEVEL_512G,
 	PG_LEVEL_NUM
 };
+static inline pgprot_t pgprot_nx(pgprot_t prot)
+{
+	return __pgprot(pgprot_val(prot) | _PAGE_NX);
+}
+#define pgprot_nx pgprot_nx
 
 #ifdef CONFIG_PROC_FS
 extern void update_page_count(int level, unsigned long pages);

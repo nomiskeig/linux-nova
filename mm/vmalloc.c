@@ -35,6 +35,7 @@
 #include <linux/uaccess.h>
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
+#include <asm/vmalloc.h>
 
 #include "internal.h"
 
@@ -42,6 +43,10 @@ struct vfree_deferred {
 	struct llist_head list;
 	struct work_struct wq;
 };
+int __must_check kmsan_ioremap_page_range(unsigned long addr, unsigned long end,
+					  phys_addr_t phys_addr, pgprot_t prot,
+					  unsigned int page_shift) {};
+
 static DEFINE_PER_CPU(struct vfree_deferred, vfree_deferred);
 
 static void __vunmap(const void *, int);

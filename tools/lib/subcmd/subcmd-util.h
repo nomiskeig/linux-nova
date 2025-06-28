@@ -47,6 +47,9 @@ static NORETURN inline void die(const char *err, ...)
 		} \
 	} while(0)
 
+// prevent compile errors, taken from https://yhbt.net/lore/all/20200203161904.846921260@linuxfoundation.org/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuse-after-free"
 static inline void *xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
@@ -61,7 +64,7 @@ static inline void *xrealloc(void *ptr, size_t size)
 	}
 	return ret;
 }
-
+#pragma GCC diagnostic pop
 #define astrcatf(out, fmt, ...)						\
 ({									\
 	char *tmp = *(out);						\

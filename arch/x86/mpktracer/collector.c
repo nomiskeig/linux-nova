@@ -219,6 +219,9 @@ patch_default_collect_read_value(char *address_to_patch,
             "Did not find a register that the instruction read into");
     }
 #endif
+// adopted from https://yhbt.net/lore/all/20200203161904.846921260@linuxfoundation.org/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
     // now, we patch a mov isntruction, but we have to respect the operand sizej
     // for the instruction handler, the address to store the reg to is rbp-0x10
     // we laod the the value from rsp + offset into rax,
@@ -285,6 +288,7 @@ patch_default_collect_read_value(char *address_to_patch,
     return 0;
 }
 
+#pragma GCC diagnostic pop
 // Normallay, we put the address for the value in r15. If the instruction uses
 // r15 (e.g. mov [rax], r15), then this breaks and we have to use another
 // register that is not used by the instruction. We try the registers downwards,

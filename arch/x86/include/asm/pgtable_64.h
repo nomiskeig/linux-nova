@@ -29,27 +29,29 @@ extern pgd_t init_top_pgt[];
 #define swapper_pg_dir init_top_pgt
 
 extern void paging_init(void);
-static inline void sync_initial_page_table(void) { }
+static inline void sync_initial_page_table(void)
+{
+}
 
-#define pte_ERROR(e)					\
-	pr_err("%s:%d: bad pte %p(%016lx)\n",		\
-	       __FILE__, __LINE__, &(e), pte_val(e))
-#define pmd_ERROR(e)					\
-	pr_err("%s:%d: bad pmd %p(%016lx)\n",		\
-	       __FILE__, __LINE__, &(e), pmd_val(e))
-#define pud_ERROR(e)					\
-	pr_err("%s:%d: bad pud %p(%016lx)\n",		\
-	       __FILE__, __LINE__, &(e), pud_val(e))
+#define pte_ERROR(e)                                                           \
+	pr_err("%s:%d: bad pte %p(%016lx)\n", __FILE__, __LINE__, &(e),        \
+	       pte_val(e))
+#define pmd_ERROR(e)                                                           \
+	pr_err("%s:%d: bad pmd %p(%016lx)\n", __FILE__, __LINE__, &(e),        \
+	       pmd_val(e))
+#define pud_ERROR(e)                                                           \
+	pr_err("%s:%d: bad pud %p(%016lx)\n", __FILE__, __LINE__, &(e),        \
+	       pud_val(e))
 
 #if CONFIG_PGTABLE_LEVELS >= 5
-#define p4d_ERROR(e)					\
-	pr_err("%s:%d: bad p4d %p(%016lx)\n",		\
-	       __FILE__, __LINE__, &(e), p4d_val(e))
+#define p4d_ERROR(e)                                                           \
+	pr_err("%s:%d: bad p4d %p(%016lx)\n", __FILE__, __LINE__, &(e),        \
+	       p4d_val(e))
 #endif
 
-#define pgd_ERROR(e)					\
-	pr_err("%s:%d: bad pgd %p(%016lx)\n",		\
-	       __FILE__, __LINE__, &(e), pgd_val(e))
+#define pgd_ERROR(e)                                                           \
+	pr_err("%s:%d: bad pgd %p(%016lx)\n", __FILE__, __LINE__, &(e),        \
+	       pgd_val(e))
 
 struct mm_struct;
 
@@ -58,6 +60,14 @@ void set_pte_vaddr_pud(pud_t *pud_page, unsigned long vaddr, pte_t new_pte);
 
 static inline void native_set_pte(pte_t *ptep, pte_t pte)
 {
+	unsigned long physical_address = pte_pfn(pte) << PAGE_SHIFT;
+	if (physical_address >= (1l << 34) &&
+
+	    physical_address < ((1l << 34) + (1l << 32))) {
+		pte = (pte_t){ .pte = (long)(pte.pte |
+					     (1l << _PAGE_BIT_PKEY_BIT0)) };
+		pr_info("protected memory at %lx", physical_address);
+	}
 	WRITE_ONCE(*ptep, pte);
 }
 
@@ -182,7 +192,7 @@ extern void sync_global_pgds(unsigned long start, unsigned long end);
 
 /* x86-64 always has all page tables mapped. */
 #define pte_offset_map(dir, address) pte_offset_kernel((dir), (address))
-#define pte_unmap(pte) ((void)(pte))/* NOP */
+#define pte_unmap(pte) ((void)(pte)) /* NOP */
 
 /*
  * Encode and de-code a swap entry
@@ -206,12 +216,12 @@ extern void sync_global_pgds(unsigned long start, unsigned long end);
  * The offset is inverted by a binary not operation to make the high
  * physical bits set.
  */
-#define SWP_TYPE_BITS		5
+#define SWP_TYPE_BITS 5
 
-#define SWP_OFFSET_FIRST_BIT	(_PAGE_BIT_PROTNONE + 1)
+#define SWP_OFFSET_FIRST_BIT (_PAGE_BIT_PROTNONE + 1)
 
 /* We always extract/encode the offset by shifting it all the way up, and then down again */
-#define SWP_OFFSET_SHIFT	(SWP_OFFSET_FIRST_BIT+SWP_TYPE_BITS)
+#define SWP_OFFSET_SHIFT (SWP_OFFSET_FIRST_BIT + SWP_TYPE_BITS)
 
 #define MAX_SWAPFILES_CHECK() BUILD_BUG_ON(MAX_SWAPFILES_SHIFT > SWP_TYPE_BITS)
 
@@ -226,14 +236,15 @@ extern void sync_global_pgds(unsigned long start, unsigned long end);
  * The offset is inverted by a binary not operation to make the high
  * physical bits set.
  */
-#define __swp_entry(type, offset) ((swp_entry_t) { \
-	(~(unsigned long)(offset) << SWP_OFFSET_SHIFT >> SWP_TYPE_BITS) \
-	| ((unsigned long)(type) << (64-SWP_TYPE_BITS)) })
+#define __swp_entry(type, offset)                                              \
+	((swp_entry_t){ (~(unsigned long)(offset) << SWP_OFFSET_SHIFT >>       \
+			 SWP_TYPE_BITS) |                                      \
+			((unsigned long)(type) << (64 - SWP_TYPE_BITS)) })
 
-#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val((pte)) })
-#define __pmd_to_swp_entry(pmd)		((swp_entry_t) { pmd_val((pmd)) })
-#define __swp_entry_to_pte(x)		((pte_t) { .pte = (x).val })
-#define __swp_entry_to_pmd(x)		((pmd_t) { .pmd = (x).val })
+#define __pte_to_swp_entry(pte) ((swp_entry_t){ pte_val((pte)) })
+#define __pmd_to_swp_entry(pmd) ((swp_entry_t){ pmd_val((pmd)) })
+#define __swp_entry_to_pte(x) ((pte_t){ .pte = (x).val })
+#define __swp_entry_to_pmd(x) ((pmd_t){ .pmd = (x).val })
 
 extern int kern_addr_valid(unsigned long addr);
 extern void cleanup_highmap(void);
@@ -241,15 +252,19 @@ extern void cleanup_highmap(void);
 #define HAVE_ARCH_UNMAPPED_AREA
 #define HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
 
-#define pgtable_cache_init()   do { } while (0)
-#define check_pgt_cache()      do { } while (0)
+#define pgtable_cache_init()                                                   \
+	do {                                                                   \
+	} while (0)
+#define check_pgt_cache()                                                      \
+	do {                                                                   \
+	} while (0)
 
-#define PAGE_AGP    PAGE_KERNEL_NOCACHE
+#define PAGE_AGP PAGE_KERNEL_NOCACHE
 #define HAVE_PAGE_AGP 1
 
 /* fs/proc/kcore.c */
-#define	kc_vaddr_to_offset(v) ((v) & __VIRTUAL_MASK)
-#define	kc_offset_to_vaddr(o) ((o) | ~__VIRTUAL_MASK)
+#define kc_vaddr_to_offset(v) ((v) & __VIRTUAL_MASK)
+#define kc_offset_to_vaddr(o) ((o) | ~__VIRTUAL_MASK)
 
 #define __HAVE_ARCH_PTE_SAME
 

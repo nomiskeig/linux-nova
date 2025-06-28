@@ -3,6 +3,8 @@
 #include "pthread.h"
 #ifdef TRACER_USERSPACE
 #include <signal.h>
+#else 
+void log_protect(long address);
 #endif
 typedef struct {
     int area[1024 / sizeof(int)];

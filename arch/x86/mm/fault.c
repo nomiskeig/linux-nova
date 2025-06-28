@@ -31,6 +31,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
+#include <asm/tracer.h>
 
 /*
  * Returns 0 if mmiotrace is disabled, or if the fault is not
@@ -1268,7 +1269,17 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 	 * have no user pages in the kernel portion of the address
 	 * space, so do not expect them here.
 	 */
-	WARN_ON_ONCE(hw_error_code & X86_PF_PK);
+	pr_info("Got a kernel fault");
+	if (hw_error_code & X86_PF_PK) {
+		ucontext_t ucontext;
+		ucontext.uc_mcontext.gregs =(tracer_regs_t)regs;
+		siginfo_t info;
+		info.si_code = SEGV_PKUERR;
+		pku_signal_handler(SIGSEGV, &info, &ucontext);
+		pr_info("Should have called pku_signal_handler");
+		return;
+
+	}
 
 	/*
 	 * We can fault-in kernel-space virtual memory on-demand. The
