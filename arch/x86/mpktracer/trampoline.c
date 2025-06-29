@@ -53,7 +53,7 @@ unsigned char invalid_opcodes[NUM_INVALID_OPCODES] = {
 #else
 unsigned char invalid_opcodes[NUM_INVALID_OPCODES] = {
     0xEA, 0xD6, 0x06, 0x07, 0x0E, 0x16, 0x17, 0x1E, 0x1F, 0x27, 0x2F, 0x37,
-    0x3F, 0x60, 0x61, 0x62, 0x82, 0x9A, 0xC4, 0xC5, 0xD4, 0xD5
+    0x3F, 0x60, 0x61, 0x62, 0x82, 0x9A, 0xC4, 0xC5, 0xD4//, 0xD5, 0xD5 is reserved for NOVA
 
 };
 #endif
@@ -66,7 +66,7 @@ repeat:
 
     if (!__atomic_compare_exchange_4(&t_lock, &val, 1, 0, __ATOMIC_SEQ_CST,
                                      __ATOMIC_SEQ_CST)) {
-		val = 0;
+        val = 0;
         goto repeat;
     }
 }
@@ -477,8 +477,11 @@ static void patch_trampoline(ProbeSite *probe_site, int pkey, char first_byte,
         // thing
         TRACER_PRINT_DEBUG_TRAMPOLINES("Could not find a trampoline, so "
                                        "patching with in invalid instruction");
+        displaced_instructions->instructions[index].trampolineInstalled = 0;
         *probe_site->rip_of_instruction = invalid_opcodes[1];
         return;
+    } else {
+        displaced_instructions->instructions[index].trampolineInstalled = 1;
     }
 #ifdef TRACER_COLLECT_TRAMPOLINE_STATISTICS
     safe_print_to_file(trampoline_fd, "After %ld\n", _rdtsc());
@@ -511,13 +514,14 @@ void install_trampoline(long address, int pkey, char first_byte,
     char buffer[40];
     buffer[0] = first_byte;
     probe_site.rip_of_instruction = (char *)address;
-	probe_site.index = index;
+    probe_site.index = index;
     // memcpy(&buffer[1], (void *)address + 1, 39);
     for (int i = 0; i < 39; i++) {
         buffer[1 + i] = *(char *)(address + 1 + i);
     }
 
-#if !(defined(TRACER_CACHE_INSTRUCTIONS) || defined(TRACER_ENCODE_INDEX_ON_TRAMPOLINE))
+#if !(defined(TRACER_CACHE_INSTRUCTIONS) ||                                    \
+      defined(TRACER_ENCODE_INDEX_ON_TRAMPOLINE))
 #ifdef TRACER_USERSPACE
 #ifndef TRACER_CACHE_INSTRUCTIONS
     ZydisDisassembledInstruction instructions[5];
@@ -1651,7 +1655,7 @@ static int patch_call_collect_pre(char *address, ProbeSite *probe_site) {
     address[13] = 0x48;
     address[14] = 0xBA;
     *((long *)&address[15]) = (long)probe_site->original_address;
-// mov rcx, index
+    // mov rcx, index
     address[23] = 0x48;
     address[24] = 0xB9;
     *((long *)&address[25]) = (long)probe_site->index;

@@ -1,4 +1,5 @@
 #pragma once
+#include "shared.h"
 
 // returns the address at which the value should be stored. This could be done
 // in an extra function, but doing it this way makes the trampoline 12 bytes
@@ -19,4 +20,7 @@ long collect_pre_wrapper(tracer_regs_t regs, long address_of_instruction, long o
 #else
 long collect_pre_wrapper(tracer_regs_t regs, long address_of_instruction, long original_address, int displaced_loc_index);
 #endif
+
+
+Trace* get_next_trace(void);
 

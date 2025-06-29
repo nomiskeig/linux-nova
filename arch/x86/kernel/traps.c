@@ -10,6 +10,7 @@
  * Handle hardware traps and faults.
  */
 
+#include "asm/tracer.h"
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/context_tracking.h>
@@ -265,10 +266,32 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 {
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
 
+	pr_info("is in do_error_trap with error code %li", error_code);
 	/*
 	 * WARN*()s end up here; fix them up before we call the
 	 * notifier chain.
 	 */
+	if (signr == SIGILL) {
+		ucontext_t ucontext;
+		ucontext.uc_mcontext.gregs = (tracer_regs_t)regs;
+		siginfo_t info;
+		info.si_code = SIGILL;
+		unsigned char* address = (unsigned char*)ucontext.uc_mcontext.gregs[TRACER_REG_RIP_DO_NOT_USE];
+		if (tracer_can_handle(address)) {
+			pr_info("found invalid instruction, value is %hxx", *address);
+			invalid_instr_signal_handler(0, &info, &ucontext);
+			return;
+		} else {
+			pr_info("blocked away invalid instruction");
+			regs->ip += 1;
+			return;
+
+		}
+
+
+
+	}
+
 	if (!user_mode(regs) && fixup_bug(regs, trapnr))
 		return;
 

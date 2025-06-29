@@ -37,7 +37,7 @@ long old;
 // this function needs to handle the case where the stored address is that of
 // the next instrution in the user space but it accessed in the kernel, the
 // offset needs to be added. The offset has to be required at runtime.
-static Trace *get_next_trace(void) {
+Trace *get_next_trace(void) {
     void *address;
     asm("mov %1, %%rax\n\t"
         "mov $1, %%rbx\n\t"

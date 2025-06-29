@@ -113,6 +113,15 @@ static void *install_trampoline_wrapper(void *args) {
 }
 #endif
 int tracer_can_handle(long address) {
+    // preveent crahs if we try to crash an invalid instruction before the
+    // tracer is initialized like we do at the beginning of nova to
+    // mount/initialize it
+    if (!displaced_instructions) {
+        return 0;
+    }
+	if (*(unsigned char*)address == 0xD5) {
+		return 1;
+	}
     return get_displaced_location_info(address, displaced_instructions) != 0x0
                ? 1
                : 0;
@@ -143,6 +152,25 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
     // and that means that we crash if we try to read the value (this does not
     // seem to be consistent when we do not do it, but i dont know why)
     // TODO: set the correct key
+#ifdef TRACER_NOVA_SUPPORT
+    TRACER_PRINT_DEBUG_NOVA("found fence");
+
+    unsigned char *addres =
+        (unsigned char *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE];
+    if (*(addres) == 0xD5) {
+        Trace *trace = get_next_trace();
+        // fence
+        if (*(addres + 1) == 0xEA) {
+            // for now we can assume that the
+            TRACER_PRINT_DEBUG_NOVA("found fence");
+        }
+        if (*(addres + 1) == 0xD6) {
+            TRACER_PRINT_DEBUG_NOVA("found clwb");
+        }
+		tracer_regs[TRACER_REG_RIP_DO_NOT_USE] +=2;
+        return;
+    }
+#endif
 #ifdef TRACER_USERSPACE
     int used_key = 1; // atoi(getenv("TRACER_PKEY"));
 #else
@@ -255,6 +283,14 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
             break;
         }
     }
+
+    // support for nova, need to trace sfence, clwb. To do that, we use an
+    // invalid instruction, 0xD5. Then we have at least 4 bytes that we can use
+    // to send meta data
+    // second byte has to also contain invalid values:
+    // 0xEA is fence
+    // 0xD6 is clwb
+    // TODO: this needs to be incoperated with the trampolines
 
     // thread_mappings->mappings[thread_index].following_info.expected_new_address
     // = 0;
@@ -382,8 +418,11 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
     volatile unsigned char head = *address;
 
     TRACER_PRINT_DEBUG("after disable write protect 2\n");
-    if (head == 0xEA || head == 0xD6|| head== 0xE9) {
-		// we have to return here, i think there is a case where this can read a valid head, i.e. the orginal instruction, then put ea there after the installer thread overwrites the 0xEA byte, which results in this threads waiting for the byte to change
+    if (head == 0xEA || head == 0xD6 || head == 0xE9) {
+        // we have to return here, i think there is a case where this can read a
+        // valid head, i.e. the orginal instruction, then put ea there after the
+        // installer thread overwrites the 0xEA byte, which results in this
+        // threads waiting for the byte to change
 #ifdef TRACER_PREVENT_LIBC
         use_glibc[thread_index] = 1;
 #endif
@@ -398,8 +437,8 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
     // another thread is installing the trampoline, and has already written
     // the displaced instruction, so just continue
     //
-	if (!__atomic_compare_exchange_1(address, (void*)&head, 0xEA, 0, __ATOMIC_SEQ_CST,
-                                     __ATOMIC_SEQ_CST)) {
+    if (!__atomic_compare_exchange_1(address, (void *)&head, 0xEA, 0,
+                                     __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
         TRACER_PRINT_DEBUG("returning bece other thread is already "
                            "isntalling trampoline\n");
 #ifdef TRACER_PREVENT_LIBC
@@ -485,6 +524,25 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
         }
         */
 #endif
+    }
+
+    DisplacedInstructionLocation *loc =
+        get_displaced_location_info((long)address, displaced_instructions);
+    if (loc && !loc->trampolineInstalled) {
+        // catch the case where no trampoline is found and the thread continues
+        // with the next instructoin, traps and then tries to install another
+        // trampoline. This differs from the case where a trampoline can be
+        // found because there, the isntauction head is reaplced with an invalid
+        // instruction so we do not get here also other threads dont wait in the
+        // loop below because the installer thread will always eventually change
+        // the byte from 0xEA, i hope
+        // reinstall the original valuue that we replaced with 0xEA, that should
+        // be fine
+
+        *address = head;
+
+        tracer_core_handler(number, info, ucontext, 0);
+        return;
     }
 
     TRACER_PRINT_DEBUG("installing trampoline 2, locatoin is %lx", location);

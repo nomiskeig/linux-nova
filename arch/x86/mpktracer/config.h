@@ -14,7 +14,7 @@
 
 #define TRACER_LOG_DEBUG_STARTER
 #define TRACER_LOG_ERROR
-//#define DISABLE_DEBUG
+#define DISABLE_DEBUG
 #ifndef DISABLE_DEBUG
 #define TRACER_LOG_DEBUG_STARTER
 //#define TRACER_LOG_DEBUG_COLLECTOR
@@ -43,6 +43,7 @@
 
 //#define TRACER_LOG_DEBUG_TRACE_ADDRESS
 #endif
+#define TRACER_LOG_DEBUG_NOVA
 
 //#define TRACER_LOG_DEBUG_NORMAL_PRINT
 //#define TRACER_LOG_DEBUG_CONTEXT
@@ -79,7 +80,7 @@
 // on a trampoline but is an invalid instruction in the program
 //#define TRACER_TRACE_SUBSEQUENT // enables the probe that allows us to decide wether we have to trace a subequent instruciton
 //#define TRACER_COLLECT_TRAMPOLINE_STATISTICS
-#define TRACER_USE_TRAMPOLINES
+//#define TRACER_USE_TRAMPOLINES
 //
 #ifdef TRACER_USERSPACE
 #define disable_pkey(X) pkey_set(X, 0)
@@ -130,6 +131,7 @@
 //
 //
 #define TRACER_TRACE_KERNEL
+#define TRACER_NOVA_SUPPORT
 ////
 ///
 ///OPTIMIZATIONS

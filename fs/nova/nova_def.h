@@ -94,7 +94,7 @@ extern int support_clwb;
 	asm volatile(".byte 0x66; clflush %0" : "+m" \
 		     (*(volatile char *)(addr)))
 #define _mm_clwb(addr)\
-	asm volatile(".byte 0x66; xsaveopt %0" : "+m" \
+	asm volatile(".byte 0xd5,0xd6, 0x66; xsaveopt %0" : "+m" \
 		     (*(volatile char *)(addr)))
 
 /* Provides ordering from all previous clflush too */
@@ -105,7 +105,7 @@ static inline void PERSISTENT_MARK(void)
 
 static inline void PERSISTENT_BARRIER(void)
 {
-	asm volatile ("sfence\n" : : );
+	asm volatile (".byte 0xd5, 0xea;\n\t sfence\n" : : );
 }
 
 static inline void nova_flush_buffer(void *buf, uint32_t len, bool fence)
