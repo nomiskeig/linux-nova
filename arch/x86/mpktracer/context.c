@@ -534,7 +534,7 @@ int patch_store_updated_regs(char *current_address, used_regs used_registers,
 
             // mov the base of regs into r15
             // mov r15, -8[rbp]
-            if (modified_registers & RBP) {
+            if (modified_registers & RBP || used_registers & RBP) {
                 // if rbp was modifed, we cannot use it to reload the base, so
                 // just use the rbp value stored in front
                 int offset =

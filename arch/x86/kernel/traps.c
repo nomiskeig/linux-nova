@@ -272,6 +272,7 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 	 * notifier chain.
 	 */
 	if (signr == SIGILL) {
+		pr_info("found sigill instruction");
 		ucontext_t ucontext;
 		ucontext.uc_mcontext.gregs = (tracer_regs_t)regs;
 		siginfo_t info;
@@ -282,9 +283,15 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 			invalid_instr_signal_handler(0, &info, &ucontext);
 			return;
 		} else {
-			pr_info("blocked away invalid instruction");
-			regs->ip += 1;
-			return;
+			pr_info("blocked away invalid instruction with value %hhx, second byte %hhx at address 0x%lx", *address, *(address + 1), address);
+			if (*address == 0x0F && *(address + 1) == 0x0B) {
+				// this is an official invalid instruction, so let it through i guess
+
+			} else {
+				regs->ip += 1;
+				return;
+
+			}
 
 		}
 

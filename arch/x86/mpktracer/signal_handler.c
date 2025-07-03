@@ -762,6 +762,7 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
     }
 #endif
     TRACER_PRINT_DEBUG_CONTEXT("Instruction: %li", location_of_instruction);
+    TRACER_PRINT_DEBUG_NOVA("Instruction: %li", location_of_instruction);
 
     // see
     // https://stackoverflow.com/questions/14698350/x86-64-asm-maximum-bytes-for-an-instruction
@@ -817,7 +818,8 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
 #else
     offset = OFFSET_FROM_BUFFER_START;
 #endif
-    if (instruction.info.mnemonic == ZYDIS_MNEMONIC_NOP) {
+// i do not think that we want to trace clwb instruction even though its technically a read
+    if (instruction.info.mnemonic == ZYDIS_MNEMONIC_NOP || instruction.info.mnemonic == ZYDIS_MNEMONIC_CLWB) {
         is_following = 1;
         following_must_be_traced = TRACER_DO_NOT_TRACE;
     }

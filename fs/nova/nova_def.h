@@ -105,6 +105,7 @@ static inline void PERSISTENT_MARK(void)
 
 static inline void PERSISTENT_BARRIER(void)
 {
+
 	asm volatile (".byte 0xd5, 0xea;\n\t sfence\n" : : );
 }
 

@@ -1271,6 +1271,7 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 	 */
 	pr_info("Got a kernel fault");
 	if (hw_error_code & X86_PF_PK) {
+		pr_info("hw error code: %lx", hw_error_code);
 		ucontext_t ucontext;
 		ucontext.uc_mcontext.gregs =(tracer_regs_t)regs;
 		siginfo_t info;
