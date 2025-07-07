@@ -26,7 +26,7 @@ ZydisDisassembledInstruction *temp_instructions;
 long alternate_stack_address;
 long trampoline_stack_base;
 long base_patch_address;
-long kernel_trace_diff;
+//long kernel_trace_diff;
 int id_offset;
 int use_glibc[MAX_SUPPORTED_THREADS];
 TraceAddresses *trace_addresses;
@@ -382,9 +382,12 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		(void *)base_patch_address, (void *)valuebuffer,
 		(void *)tracebuffer);
 
-	tracebuffer->next_trace_address = (void *)&tracebuffer->traces[0];
-	tracebuffer->amount = 0;
-	valuebuffer->next_offset = 0;
+	// TODO: this needs to be activated if the tracer runs standalone in the kernel and is not used in tandom with the userspace
+	// but if it is used with the usersapce the buffer is initialized in the inject.c file
+	//tracebuffer->next_trace_address = (void *)&tracebuffer->traces[0];
+
+	//tracebuffer->amount = 0;
+	//valuebuffer->next_offset = 0;
 #ifdef TRACER_LOG_DEBUG_STUB_FUNCTION
 	disassembled_instruction = (ZydisDisassembledInstruction *)kzalloc(
 		sizeof(ZydisDisassembledInstruction), GFP_KERNEL);
@@ -415,13 +418,12 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	temp_instructions = (ZydisDisassembledInstruction *)kzalloc(
 		sizeof(ZydisDisassembledInstruction) * 5, GFP_KERNEL);
 	trampoline_stack_base = (long)kmalloc(PAGE_SIZE * 4, GFP_KERNEL);
-	kernel_trace_diff = (long)&tracebuffer->traces[0] - (long)(&(((Tracebuffer*)trace_buffer_address)->traces[0]));
-	TRACER_PRINT_DEBUG("Done mapping the buffers into the kernel, diff is %lx", kernel_trace_diff);
+	//kernel_trace_diff = (long)&tracebuffer->traces[0] - (long)(&(((Tracebuffer*)trace_buffer_address)->traces[0]));
+	//TRACER_PRINT_DEBUG("Done mapping the buffers into the kernel, diff is %lx", kernel_trace_diff);
 	TRACER_PRINT_DEBUG(
-		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px",
+		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px, current offset is %lx",
 		(void *)base_patch_address, (void *)valuebuffer,
-		(void *)tracebuffer);
-	enable_write_protection();
+		(void *)tracebuffer, tracebuffer->offset); enable_write_protection();
 }
 
 long get_tracebuffer_address(void)
@@ -437,7 +439,7 @@ void reset_buffers(void)
 	TRACER_PRINT_DEBUG("Resetting buffers");
 	valuebuffer->next_offset = 0;
 	tracebuffer->amount = 0;
-	tracebuffer->next_trace_address = (void *)&tracebuffer->traces[0];
+	tracebuffer->offset = (long)&tracebuffer + (long)(&tracebuffer->traces[0]);
 }
 
 EXPORT_SYMBOL(tracer_kernel_init);

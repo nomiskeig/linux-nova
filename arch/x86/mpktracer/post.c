@@ -113,7 +113,7 @@ void tracing_probe(long expected) {
 // this is called from the trampoline
 void collect_post_wrapper(tracer_regs_t regs, long address_of_instruction) {
 #ifdef TRACER_MEASURE_TRAMPOLINES
-	long start_ticks = rdtsc_fence();
+    long start_ticks = rdtsc_fence();
 #endif
 #ifdef TRACER_MEASURE_HANDLERS_THREADS
     long start_ticks = rdtsc();
@@ -181,11 +181,11 @@ void collect_post_wrapper(tracer_regs_t regs, long address_of_instruction) {
     TRACER_PRINT_DEBUG_CONTEXT("R15: %016llx", regs[TRACER_REG_R15]);
     TRACER_PRINT_DEBUG_CONTEXT("RIP: %016llx", regs[TRACER_REG_RIP_DO_NOT_USE]);
 #endif
-	#ifdef TRACER_MEASURE_HANDLERS_THREADS
+#ifdef TRACER_MEASURE_HANDLERS_THREADS
     long before_collect_ticks = rdtsc();
 #endif
     collect_post(regs, 1);
-	#ifdef TRACER_MEASURE_HANDLERS_THREADS
+#ifdef TRACER_MEASURE_HANDLERS_THREADS
     long after_collect_ticks = rdtsc();
 #endif
     TRACER_PRINT_DEBUG_POST("Restoring regs after collect post");
@@ -203,8 +203,9 @@ void collect_post_wrapper(tracer_regs_t regs, long address_of_instruction) {
         end_ticks - start_ticks - (after_collect_ticks - before_collect_ticks);
 #endif
 #ifdef TRACER_MEASURE_TRAMPOLINES
-	long end_ticks = rdtsc_fence();;
-	measurements->post_handler = end_ticks-start_ticks;
+    long end_ticks = rdtsc_fence();
+    ;
+    measurements->post_handler = end_ticks - start_ticks;
 #endif
 }
 
@@ -235,7 +236,9 @@ void collect_post(tracer_regs_t regs, int from_trampoline) {
 #endif
 #endif
 #ifdef TRACER_COLLECT_RFLAGS_POST
+#ifndef TRACER_NOVA_SUPPORT
     trace->rflags_post = regs[TRACER_REG_FLAGS];
+#endif
 #endif
 #ifdef TRACER_MEASURE_HANDLERS
     long end_ticks = rdtsc_fence();

@@ -116,12 +116,26 @@ int tracer_can_handle(long address) {
     // preveent crahs if we try to crash an invalid instruction before the
     // tracer is initialized like we do at the beginning of nova to
     // mount/initialize it
+
+    TRACER_PRINT_DEBUG("is at beginning of tracer_can_handle");
     if (!displaced_instructions) {
         return 0;
     }
-	if (*(unsigned char*)address == 0xD5) {
-		return 1;
-	}
+#ifdef TRACER_USERSPACE
+    // make the page readable so we do not crash if we trace an invalid
+    // instruction in userspace without it being a trampoline
+    void *location_to_pick_page =
+        (void *)((long)address - ((long)address % 4096));
+    // TODO: we have to restore the original protections
+    mprotect(location_to_pick_page, 4096 * 2,
+             PROT_READ | PROT_WRITE | PROT_EXEC);
+#endif
+    TRACER_PRINT_DEBUG("before in tracer can handle\n");
+    if (*(unsigned char *)address == 0xD5) {
+        TRACER_PRINT_DEBUG("inside in tracer can handle\n");
+        return 1;
+    }
+    TRACER_PRINT_DEBUG("after in tracer can handle\n");
     return get_displaced_location_info(address, displaced_instructions) != 0x0
                ? 1
                : 0;
@@ -153,7 +167,6 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
     // seem to be consistent when we do not do it, but i dont know why)
     // TODO: set the correct key
 #ifdef TRACER_NOVA_SUPPORT
-    TRACER_PRINT_DEBUG_NOVA("found fence");
 
     unsigned char *addres =
         (unsigned char *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE];
@@ -161,13 +174,21 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
         Trace *trace = get_next_trace();
         // fence
         if (*(addres + 1) == 0xEA) {
-            // for now we can assume that the
+            // for now we can assume that the only fence we find is an sfence
+            trace->type = TYPE_FENCE;
+            trace->mnemonic = 1;
             TRACER_PRINT_DEBUG_NOVA("found fence");
         }
         if (*(addres + 1) == 0xD6) {
+            trace->type = TYPE_FLUSH;
+            trace->mnemonic = 1;
             TRACER_PRINT_DEBUG_NOVA("found clwb");
         }
-		tracer_regs[TRACER_REG_RIP_DO_NOT_USE] +=2;
+        if (*(addres + 1) == 0x06) {
+            trace->type = TYPE_HYPERCALL;
+            TRACER_PRINT_DEBUG_NOVA("found hypercall");
+        }
+        tracer_regs[TRACER_REG_RIP_DO_NOT_USE] += 2;
         return;
     }
 #endif
@@ -818,8 +839,10 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
 #else
     offset = OFFSET_FROM_BUFFER_START;
 #endif
-// i do not think that we want to trace clwb instruction even though its technically a read
-    if (instruction.info.mnemonic == ZYDIS_MNEMONIC_NOP || instruction.info.mnemonic == ZYDIS_MNEMONIC_CLWB) {
+    // i do not think that we want to trace clwb instruction even though its
+    // technically a read
+    if (instruction.info.mnemonic == ZYDIS_MNEMONIC_NOP ||
+        instruction.info.mnemonic == ZYDIS_MNEMONIC_CLWB) {
         is_following = 1;
         following_must_be_traced = TRACER_DO_NOT_TRACE;
     }

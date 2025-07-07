@@ -84,6 +84,15 @@ static inline void native_set_pte_atomic(pte_t *ptep, pte_t pte)
 
 static inline void native_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+	// this seems to do absolutly nothing, which is sad becuase i dont know where stuff is mapped then
+	unsigned long physical_address = pmd_pfn(pmd) << PAGE_SHIFT;
+	if (physical_address >= (1l << 34) &&
+
+	    physical_address < ((1l << 34) + (1l << 32))) {
+		pmd = (pmd_t){ .pmd = (long)(pmd.pmd |
+					     (1l << _PAGE_BIT_PKEY_BIT0)) };
+		pr_info("protected memory at %lx via pmd entry", physical_address);
+	}
 	WRITE_ONCE(*pmdp, pmd);
 }
 

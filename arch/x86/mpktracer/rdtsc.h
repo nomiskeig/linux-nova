@@ -17,7 +17,7 @@ static __inline__ long rdtsc_fence(void) {
 
     return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
 }
-static __inline__ long rdtsc(void) {
+static __inline__ long rdtsc_self(void) {
     unsigned long hi, lo;
     __asm__ __volatile__(
                          "rdtsc"

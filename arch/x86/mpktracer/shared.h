@@ -3,9 +3,17 @@
 #include "pthread.h"
 #ifdef TRACER_USERSPACE
 #include <signal.h>
-#else 
+#else
 void log_protect(long address);
 #endif
+enum EntryType {
+    TYPE_WRITE,
+    TYPE_FENCE,
+    TYPE_FLUSH,
+    TYPE_READ,
+    TYPE_HYPERCALL
+
+};
 typedef struct {
     int area[1024 / sizeof(int)];
 } XsaveArea;
@@ -21,6 +29,7 @@ typedef struct {
     long time_pre;
 } Trace;
 #else
+#ifndef TRACER_NOVA_SUPPORT
 typedef struct {
     long value_size_and_location;
     long long value;
@@ -28,12 +37,29 @@ typedef struct {
     long virtual_address;
     long rip_pre;
     long rflags_pre;
-    //long time_pre; // time since programm start in seconds
+    // long time_pre; // time since programm start in seconds
     long rip_post;
     long rflags_post;
-    //long time_post;
-	//long unused_padding[6];
+    // long time_post;
+    // long unused_padding[6];
 } Trace;
+#else
+typedef struct {
+    int type;     // the values are defined by the auto generated encode/decode
+                  // functions in the vinter repo, target directory.
+                  // 0 -> write
+                  // 1 -> fence
+                  // 2 -> flush
+                  // 3 -> read
+                  // 4 -> hypercall
+    int mnemonic; // use use numbers and parse them in rust
+    int id;
+    int non_temporal;
+    long value_size_and_location;
+    long value;
+    long address;
+} Trace;
+#endif
 #endif
 typedef struct {
     Trace *trace_address[MAX_SUPPORTED_THREADS];
@@ -48,9 +74,15 @@ typedef
 #endif
 
     struct {
-    Trace *next_trace_address;
+    // Trace *next_trace_address;
+	
+    //  offset from the beginngin of the buffer to the address that can be used
+    //  for the next trace, then we need to set the base_trace_buffer_address
+    //  each time we inject the tracer and in the kernel, but those values have
+    //  to be userspace/kernel local
+    long offset;
     long amount;
-	long padding[6];
+    long padding[6];
     Trace __attribute__((aligned(64))) traces[MAX_AMOUNT_TRACES];
 } Tracebuffer;
 typedef struct {
@@ -140,17 +172,15 @@ typedef struct {
     long tramp_first_length[MAX_SUPPORTED_THREADS][2000];
     long tramp_install_addresses[MAX_SUPPORTED_THREADS][700];
     int mem_timings_file;
-	int used_tramp_pages[MAX_SUPPORTED_THREADS];
+    int used_tramp_pages[MAX_SUPPORTED_THREADS];
 } Measurements;
 
-
 typedef struct {
-	long rip;
-	int pkey;
-	char first_byte;
-	int is_tracing_following;
-	long original_address;
-
+    long rip;
+    int pkey;
+    char first_byte;
+    int is_tracing_following;
+    long original_address;
 
 } TrampInstallArguments;
 void set_length(Trace *trace, long length);

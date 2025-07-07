@@ -271,7 +271,7 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 	 * WARN*()s end up here; fix them up before we call the
 	 * notifier chain.
 	 */
-	if (signr == SIGILL) {
+	if (!user_mode(regs) && signr == SIGILL) {
 		pr_info("found sigill instruction");
 		ucontext_t ucontext;
 		ucontext.uc_mcontext.gregs = (tracer_regs_t)regs;
@@ -288,7 +288,13 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 				// this is an official invalid instruction, so let it through i guess
 
 			} else {
-				regs->ip += 1;
+				if (*address == 0xD5) {
+					// this is one of our traps, skip two, otherwise skip one
+				regs->ip += 2;
+
+				} else {
+					regs->ip += 1;
+				}
 				return;
 
 			}

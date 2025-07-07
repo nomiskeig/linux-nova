@@ -1,6 +1,7 @@
+#include "instruction.h"
 #define _GNU_SOURCE
-#include "pre.h"
 #include "config.h"
+#include "pre.h"
 #ifdef TRACER_USERSPACE
 #include "pthread.h"
 #include <err.h>
@@ -11,6 +12,9 @@
 #include "shared.h"
 extern Measurements *measurements;
 #endif
+#else 
+#include <asm/io.h>
+#include <linux/mm.h>
 
 #endif
 #include "collector.h"
@@ -22,7 +26,6 @@ extern Tracebuffer *tracebuffer;
 extern Valuebuffer *valuebuffer;
 extern DisplacedInstructions *displaced_instructions;
 extern int id_offset;
-extern long kernel_trace_diff;
 #ifdef TRACER_PREVENT_LIBC
 extern int use_glibc[MAX_SUPPORTED_THREADS];
 #endif
@@ -38,7 +41,7 @@ long old;
 // the next instrution in the user space but it accessed in the kernel, the
 // offset needs to be added. The offset has to be required at runtime.
 Trace *get_next_trace(void) {
-    void *address;
+    long offset;
     asm("mov %1, %%rax\n\t"
         "mov $1, %%rbx\n\t"
         "lock xadd %%rax, %2\n\t" // add to next_trace_address, rax has to be
@@ -52,11 +55,11 @@ Trace *get_next_trace(void) {
         // thats not my problem anyways )
         // rax now contains the value which we use for this trace
         "mov %%rax, %0\n\t"
-        : "=m"(address)
+        : "=m"(offset)
 #ifdef TRACER_OVERWRITE_TRACES
         : "mri"(0x0), "m"(tracebuffer->next_trace_address),
 #else
-        : "mr"(sizeof(Trace)), "m"(tracebuffer->next_trace_address),
+        : "mr"(sizeof(Trace)), "m"(tracebuffer->offset),
 #endif
           "m"(tracebuffer->amount)
         : "rax", "rbx");
@@ -74,6 +77,7 @@ if ((long)address < 0x1000) {
     TRACER_PRINT_ERROR("got the wrong address");
 }
 */
+    Trace *trace = (Trace *)(offset + (long)tracebuffer);
 #ifdef TRACER_LOG_ERROR
 #ifndef TRACER_OVERWRITE_TRACES
     if (tracebuffer->amount > (MAX_AMOUNT_TRACES - 4)) {
@@ -94,31 +98,41 @@ if ((long)address < 0x1000) {
     ((Trace *)address)->rflags_post = 0l;
 
 #endif
-TRACER_PRINT_DEBUG("next address is %lx, from userspace is %lx", (long)address + kernel_trace_diff, (long)address);
-#ifdef TRACER_USERSPACE
-    return address;
-#else
-    return (Trace*)((long)address + kernel_trace_diff);
+#ifdef TRACER_NOVA_SUPPORT
+    // TODO: this is racy, but also like why does this crash????, coiuld be
+    // becuase int and long types for id
+    trace->id = tracebuffer->amount;
 #endif
+    TRACER_PRINT_DEBUG("next address is %lx",
+                       (long)offset + (long)&tracebuffer);
+    return trace;
 }
 
 #ifndef TRACER_COUNT_AMOUNT_TAKEN
 static void collect_registers_pre(tracer_regs_t regs, long rip_of_address,
                                   Trace *trace) {
 #ifdef TRACER_COLLECT_RIP_PRE
+#ifndef TRACER_NOVA_SUPPORT
     trace->rip_pre = rip_of_address;
+#endif
 #endif
 #ifdef TRACER_COLLECT_RFLAGS_PRE
 #ifndef TRACER_NO_HANDLER_SAVE_RESTORE
+#ifndef TRACER_NOVA_SUPPORT
     trace->rflags_pre = regs[TRACER_REG_FLAGS];
+#endif
 #endif
 #endif
 }
 static void collect_thread_id(Trace *trace) {
 #ifdef TRACER_USERSPACE
+#ifndef TRACER_NOVA_SUPPORT
     trace->thread_id = pthread_self();
+#endif
 #else
+#ifndef TRACER_NOVA_SUPPORT
     trace->thread_id = 0;
+#endif
 #endif
 }
 
@@ -142,13 +156,14 @@ static void collect_address(tracer_regs_t regs,
     // instruction has exacly one memory operand, we search it and then
     // calculate the address based on it
 
+	long address;
     for (int i = 0; i < instruction->info.operand_count; i++) {
         ZydisDecodedOperand *op = &instruction->operands[i];
         if (op->type != ZYDIS_OPERAND_TYPE_MEMORY) {
             continue;
         }
         TracerRegister base = get_offset_of_reg(op->mem.base);
-        long address = regs[tracer_reg_to_specific_reg_index(base)];
+        address = regs[tracer_reg_to_specific_reg_index(base)];
         if (op->mem.disp.size > 0) {
             address += op->mem.disp.value;
         }
@@ -161,9 +176,25 @@ static void collect_address(tracer_regs_t regs,
         //     "next print should be the address of virtual address");
         // TRACER_PRINT_DEBUG("trace->virtual_address is %p, and trace is %p",
         //                   (void *)&trace->virtual_address, (void *)trace);
+	//
+	}
+#ifndef TRACER_NOVA_SUPPORT
         trace->virtual_address = address;
+#else
+        // we need to calculate the physiacal address and subtract from that the
+        // beginnig of the pyhsical mapping since vinter expects addresses
+        // starting at 0
+		#ifndef TRACER_USERSPACE
+		// PERF: this is probably slow and the offset should be stored somewhere and not calculated each time
+	//trace->address = ((page_to_phys(vmalloc_to_page((void *) address)) - (0x1l << 34)) | (address & 0xFFF));
+	//trace->address = (page_to_phys(vmalloc_to_page((void *) address))) ;//| (address & 0xFFF);
+	trace->address = address;
+
+#else
+        trace->address = address;
+#endif
+#endif
         // TRACER_PRINT_DEBUG("set virtual address of instruction");
-    }
 }
 #endif
 // This is called from the trampoline, we also need the register
@@ -363,6 +394,16 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     TRACER_PRINT_DEBUG_CONTEXT("R14: %016llx", regs[TRACER_REG_R14]);
     TRACER_PRINT_DEBUG_CONTEXT("R15: %016llx", regs[TRACER_REG_R15]);
     TRACER_PRINT_DEBUG_CONTEXT("RIP: %016llx", regs[TRACER_REG_RIP_DO_NOT_USE]);
+#endif
+#ifdef TRACER_NOVA_SUPPORT
+    if (is_write(instruction)) {
+
+#ifdef TRACER_TRACE_KERNEL
+#endif
+        trace->type = TYPE_WRITE;
+    } else {
+        trace->type = TYPE_READ;
+    }
 #endif
 
     long res = get_and_set_value_address(instruction, trace, valuebuffer);
