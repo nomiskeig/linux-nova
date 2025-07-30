@@ -347,6 +347,7 @@ int get_fd();
 #define TRACER_PRINT_DEBUG_PRE(...)
 #endif
 #ifdef TRACER_LOG_DEBUG_NOVA
+
 #ifndef TRACER_USERSPACE
 #define TRACER_PRINT_DEBUG_NOVA(...)                                           \
     do {                                                                       \

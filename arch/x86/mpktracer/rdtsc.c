@@ -26,10 +26,10 @@ void rdtsc_calibrate(void) {
      * precisely how long the sleep was.
      */
     clock_gettime(CLOCK_MONOTONIC, &start_ts);
-    start_ticks = rdtsc();
+    start_ticks = rdtsc_self();
     rdtsc_ticks_init = start_ticks;
     usleep(2000); /* ~2 ms. */
-    end_ticks = rdtsc();
+    end_ticks = rdtsc_self();
     clock_gettime(CLOCK_MONOTONIC, &end_ts);
 
     start_ns = (uint64_t)start_ts.tv_sec * UINT64_C(1000000000) +

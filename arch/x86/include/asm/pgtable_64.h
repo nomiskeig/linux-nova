@@ -57,13 +57,20 @@ struct mm_struct;
 
 void set_pte_vaddr_p4d(p4d_t *p4d_page, unsigned long vaddr, pte_t new_pte);
 void set_pte_vaddr_pud(pud_t *pud_page, unsigned long vaddr, pte_t new_pte);
+#ifdef TRACER_VM_TESTING
+#define PMEM_START (1l << 34)
+#define PMEM_LEN (1l << 32)
+#else
+#define PMEM_START 134217728
+#define PMEM_LEN 5242880
+#endif
 
 static inline void native_set_pte(pte_t *ptep, pte_t pte)
 {
 	unsigned long physical_address = pte_pfn(pte) << PAGE_SHIFT;
-	if (physical_address >= (1l << 34) &&
+	if (physical_address >= PMEM_START &&
 
-	    physical_address < ((1l << 34) + (1l << 32))) {
+	    physical_address < (PMEM_START + PMEM_LEN)) {
 		pte = (pte_t){ .pte = (long)(pte.pte |
 					     (1l << _PAGE_BIT_PKEY_BIT0)) };
 		pr_info("protected memory at %lx", physical_address);

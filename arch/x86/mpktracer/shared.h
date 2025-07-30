@@ -21,6 +21,13 @@ typedef struct {
 
     XsaveArea areas[MAX_SUPPORTED_THREADS];
 } XsaveAreas;
+typedef enum _RepSize {
+    REP_SIZE_8,
+    REP_SIZE_16,
+    REP_SIZE_32,
+    REP_SIZE_64
+} RepSize;
+typedef enum _RepType { REP_TYPE_STOS = 0x1 } RepType;
 #ifdef TRACER_COUNT_AMOUNT_TAKEN
 typedef struct {
     long value_size_and_location;
@@ -30,18 +37,28 @@ typedef struct {
 } Trace;
 #else
 #ifndef TRACER_NOVA_SUPPORT
+
 typedef struct {
     long value_size_and_location;
     long long value;
     long thread_id;
     long virtual_address;
     long rip_pre;
+	long type; // make stuff compatible with nova
+	long mnemonic; // make stuff compatible with nova
     long rflags_pre;
     // long time_pre; // time since programm start in seconds
     long rip_post;
     long rflags_post;
     // long time_post;
     // long unused_padding[6];
+    int flags; // used for storing information about rep prefixes and su
+               // third lowest bit set => rep prefix
+               // two lowest bits => encode size
+               // size stores value from rcs, i.e. the amount of repeats, so the
+               // total size
+               // is size * amount
+               // higher bits encode the type of rep
 } Trace;
 #else
 typedef struct {
@@ -58,6 +75,7 @@ typedef struct {
     long value_size_and_location;
     long value;
     long address;
+    long flags;
 } Trace;
 #endif
 #endif
@@ -75,7 +93,7 @@ typedef
 
     struct {
     // Trace *next_trace_address;
-	
+
     //  offset from the beginngin of the buffer to the address that can be used
     //  for the next trace, then we need to set the base_trace_buffer_address
     //  each time we inject the tracer and in the kernel, but those values have
@@ -188,3 +206,10 @@ void set_intern(Trace *trace);
 void set_extern(Trace *trace);
 int is_intern(Trace *trace);
 long get_size(Trace *trace);
+
+void setRep(Trace *trace);
+int isRep(Trace *trace);
+void setRepSize(Trace *trace, RepSize size);
+RepSize getRepSize(Trace *trace);
+void setRepType(Trace *trace, RepType type);
+RepType getRepType(Trace *trace);

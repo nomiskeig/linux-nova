@@ -94,7 +94,7 @@ extern int support_clwb;
 	asm volatile(".byte 0x66; clflush %0" : "+m" \
 		     (*(volatile char *)(addr)))
 #define _mm_clwb(addr)\
-	asm volatile(".byte 0xd5,0xd6, 0x66; xsaveopt %0" : "+m" \
+	asm volatile(".byte 0xd5,0xd6;\n\t .byte 0x66; xsaveopt %0" : "+m" \
 		     (*(volatile char *)(addr)))
 
 /* Provides ordering from all previous clflush too */

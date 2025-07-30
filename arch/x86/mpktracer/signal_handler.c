@@ -166,11 +166,14 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
     // and that means that we crash if we try to read the value (this does not
     // seem to be consistent when we do not do it, but i dont know why)
     // TODO: set the correct key
-#ifdef TRACER_NOVA_SUPPORT
+#ifdef TRACER_SUPPORT_CUSTOM_INVALID
 
     unsigned char *addres =
         (unsigned char *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE];
     if (*(addres) == 0xD5) {
+#ifndef TRACER_USERSPACE
+        pr_info("getting trace for fence, flush or hypercall");
+#endif
         Trace *trace = get_next_trace();
         // fence
         if (*(addres + 1) == 0xEA) {
@@ -183,12 +186,37 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
             trace->type = TYPE_FLUSH;
             trace->mnemonic = 1;
             TRACER_PRINT_DEBUG_NOVA("found clwb");
+            // we know that htis is followed by a clwb isntrution so we
+            // disasseble it to get the address;
+            ZyanUSize longest_length = 15;
+            ZydisDisassembledInstruction instruction;
+            ZyanStatus status = ZydisDisassembleIntel(
+                /* machine_mode:    */ ZYDIS_MACHINE_MODE_LONG_64,
+                /* runtime_address: */ tracer_regs[TRACER_REG_RIP_DO_NOT_USE] +
+                    2,
+                /* buffer:          */ (void *)addres + 2,
+                /* length:          */ longest_length,
+                /* instruction:     */ &instruction);
+
+            if (instruction.info.mnemonic != ZYDIS_MNEMONIC_CLWB) {
+                TRACER_PRINT_ERROR("Did not decode a clwb instruction");
+            }
+            if (!ZYAN_SUCCESS(status)) {
+                TRACER_PRINT_ERROR(
+                    "Could not decode the instruction in the signal handler");
+            }
+            collect_address(tracer_regs, &instruction, trace);
         }
         if (*(addres + 1) == 0x06) {
             trace->type = TYPE_HYPERCALL;
+            trace->value = 0l;
+            trace->value = (long)tracer_regs[TRACER_REG_RBX];
+            TRACER_PRINT_DEBUG("new value is %lx, %lx\n, ", trace->value,
+                               tracer_regs[TRACER_REG_RBX]);
             TRACER_PRINT_DEBUG_NOVA("found hypercall");
         }
         tracer_regs[TRACER_REG_RIP_DO_NOT_USE] += 2;
+        TRACER_PRINT_DEBUG("returning to program");
         return;
     }
 #endif
@@ -256,6 +284,7 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
 }
 
 void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
+    TRACER_PRINT_DEBUG("is in signal handler\n");
 #ifdef TRACER_MEASURE_SIGNAL_HANDLER
     long ticks_handler_start = rdtsc();
 #endif

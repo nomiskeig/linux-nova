@@ -14,7 +14,7 @@
 
 #define TRACER_LOG_DEBUG_STARTER
 #define TRACER_LOG_ERROR
-#define DISABLE_DEBUG
+//#define DISABLE_DEBUG
 #ifndef DISABLE_DEBUG
 #define TRACER_LOG_DEBUG_STARTER
 //#define TRACER_LOG_DEBUG_COLLECTOR
@@ -25,7 +25,7 @@
 #define TRACER_LOG_DEBUG_SYSCALL_HANDLER
 #define TRACER_LOG_DEBUG_KERNEL_TRACER
  #define TRACER_LOG_DEBUG_NORMAL_PRINT
-// #define TRACER_LOG_DEBUG_PTRACE
+ #define TRACER_LOG_DEBUG_PTRACE
 //#define TRACER_LOG_DEBUG_PTRACE_SYSCALLS
 //#define TRACER_LOG_PTRACE_ALL
 #define TRACER_LOG_DEBUG_WRITER
@@ -45,7 +45,7 @@
 #endif
 #define TRACER_LOG_DEBUG_NOVA
 
-#define TRACER_LOG_DEBUG_NORMAL_PRINT
+//#define TRACER_LOG_DEBUG_NORMAL_PRINT
 //#define TRACER_LOG_DEBUG_CONTEXT
 // things that write to files
 // #define TRACER_LOG_MMAPS_AND_PROT
@@ -69,8 +69,8 @@
 //#define TRACER_USE_HOOK_LIBC // needs prevent_libc
 
 // #define TRACER_TRACE_NONE
-#define TRACER_TRACE_WRITES
-//#define TRACER_TRACE_ALL
+//#define TRACER_TRACE_WRITES
+#define TRACER_TRACE_ALL
 
 // #define TRACER_USE_DUMP_ALLOCATOR
 #define TRACER_USE_IMPROVED_ALLOCATOR
@@ -127,11 +127,14 @@
 // #define TRACER_COLLECT_SECONDS // with this setting, the timestamp is
 // a double that in seconds provides the time since program start, without it,
 // the current timestamp from rdtsc is recorded
-//  #define TRACER_LOG_TO_CONSOLE
+  #define TRACER_LOG_TO_CONSOLE
 //
-//
+
 #define TRACER_TRACE_KERNEL
 #define TRACER_NOVA_SUPPORT
+#define TRACER_VM
+#define TRACER_SUPPORT_CUSTOM_INVALID
+#define TRACER_VINTER
 ////
 ///
 ///OPTIMIZATIONS

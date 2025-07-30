@@ -4,15 +4,15 @@
 #include "pre.h"
 #ifdef TRACER_USERSPACE
 #include "pthread.h"
+#include "shared.h"
 #include <err.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
 #ifdef TRACER_ENABLE_MEASUREMENTS
-#include "shared.h"
 extern Measurements *measurements;
 #endif
-#else 
+#else
 #include <asm/io.h>
 #include <linux/mm.h>
 
@@ -147,16 +147,15 @@ static void __attribute__((unused)) collect_time_pre(Trace *trace) {
 #endif
 #endif
 }
-static void collect_address(tracer_regs_t regs,
-                            ZydisDisassembledInstruction *instruction,
-                            Trace *trace) {
+void collect_address(tracer_regs_t regs,
+                     ZydisDisassembledInstruction *instruction, Trace *trace) {
     // PERF: i think this could be optimzed by writing the instructions that
     // collect that info directly on the trampoline ... but at some point it
     // gets to complex and i have to write my own assembler... the traced
     // instruction has exacly one memory operand, we search it and then
     // calculate the address based on it
 
-	long address;
+    long address;
     for (int i = 0; i < instruction->info.operand_count; i++) {
         ZydisDecodedOperand *op = &instruction->operands[i];
         if (op->type != ZYDIS_OPERAND_TYPE_MEMORY) {
@@ -176,25 +175,32 @@ static void collect_address(tracer_regs_t regs,
         //     "next print should be the address of virtual address");
         // TRACER_PRINT_DEBUG("trace->virtual_address is %p, and trace is %p",
         //                   (void *)&trace->virtual_address, (void *)trace);
-	//
-	}
+        //
+    }
 #ifndef TRACER_NOVA_SUPPORT
-        trace->virtual_address = address;
+    trace->virtual_address = address;
 #else
-        // we need to calculate the physiacal address and subtract from that the
-        // beginnig of the pyhsical mapping since vinter expects addresses
-        // starting at 0
-		#ifndef TRACER_USERSPACE
-		// PERF: this is probably slow and the offset should be stored somewhere and not calculated each time
-	//trace->address = ((page_to_phys(vmalloc_to_page((void *) address)) - (0x1l << 34)) | (address & 0xFFF));
-	//trace->address = (page_to_phys(vmalloc_to_page((void *) address))) ;//| (address & 0xFFF);
-	trace->address = address;
+    // we need to calculate the physiacal address and subtract from that the
+    // beginnig of the pyhsical mapping since vinter expects addresses
+    // starting at 0
+#ifndef TRACER_USERSPACE
+    // PERF: this is probably slow and the offset should be stored somewhere and
+    // not calculated each time
+    // trace->address =
+    //   (page_to_phys(virt_to_page((void *)address))  - (0x1l << 34)) |
+    //   (address & 0xFFF); // trace->address =
+    trace->address =
+        (page_to_phys(virt_to_page((void *)address)) - 134217728) |
+        (address & 0xFFF); // trace->address =
+
+    // (page_to_phys(vmalloc_to_page((void *) address))) ;//| (address & 0xFFF);
+    // trace->address = address;
 
 #else
-        trace->address = address;
+    trace->address = address;
 #endif
 #endif
-        // TRACER_PRINT_DEBUG("set virtual address of instruction");
+    // TRACER_PRINT_DEBUG("set virtual address of instruction");
 }
 #endif
 // This is called from the trampoline, we also need the register
@@ -337,6 +343,9 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
 #ifdef TRACER_MEASURE_HANDLERS
     long start_ticks = rdtsc_fence();
 #endif
+#ifndef TRACER_USERSPACE
+    pr_info("getting trace for instruction %s", instruction->text);
+#endif
     Trace *trace = get_next_trace();
 #ifdef TRACER_PRINT_MEM_TRAMPOLINES
     if (from_trampoline == 1) {
@@ -350,6 +359,7 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     }
 
 #endif
+
 #ifdef TRACER_COUNT_AMOUNT_TAKEN
     if (from_trampoline == 1) {
         trace->address = 0l;
@@ -358,6 +368,30 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
         trace->address = 0l;
     }
 #endif
+    if (instruction->info.attributes & ZYDIS_ATTRIB_HAS_REP) {
+#ifndef TRACER_USERSPACE
+        pr_info("filled a rep prefix");
+#endif
+
+        switch (instruction->info.opcode) {
+        case 0xAA: {
+#ifndef TRACER_USERSPACE
+            pr_info("filled a rep prefix with prefix aa");
+#endif
+            setRep(trace);
+            setRepSize(trace, REP_SIZE_8);
+            TRACER_PRINT_DEBUG_PRE("value of rcx: %lx", regs[TRACER_REG_RCX]);
+            set_length(trace, regs[TRACER_REG_RCX]);
+            TRACER_PRINT_DEBUG_PRE("value of rax: %lx", regs[TRACER_REG_RAX]);
+            trace->value = regs[TRACER_REG_RAX] & 0xFF;
+            break;
+        }
+        default:
+            TRACER_PRINT_ERROR(
+                "unsupported rep prefix found in pre collection: %s",
+                instruction->text);
+        }
+    }
 #ifndef TRACER_COUNT_AMOUNT_TAKEN
 #ifdef TRACER_COLLECT_TIME_PRE
     collect_time_pre(trace);

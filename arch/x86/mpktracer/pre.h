@@ -21,6 +21,9 @@ long collect_pre_wrapper(tracer_regs_t regs, long address_of_instruction, long o
 long collect_pre_wrapper(tracer_regs_t regs, long address_of_instruction, long original_address, int displaced_loc_index);
 #endif
 
+void collect_address(tracer_regs_t regs,
+                            ZydisDisassembledInstruction *instruction,
+                            Trace *trace);
 
 Trace* get_next_trace(void);
 
