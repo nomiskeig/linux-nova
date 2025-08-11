@@ -50,11 +50,11 @@ typedef struct {
 	char instruction[20];
 	long orig_address;
 	tracer_follow_type type;
-#if defined(TRACER_CACHE_INSTRUCTIONS) || defined(TRACER_ENCODE_INDEX_ON_TRAMPOLINE)
+//#if defined(TRACER_CACHE_INSTRUCTIONS) || defined(TRACER_ENCODE_INDEX_ON_TRAMPOLINE)
 	ZydisDisassembledInstruction disassembled_instructions[5];
 	long orig_addresses[5];
 	int trampolineInstalled;
-#endif
+//#endif
 } DisplacedInstructionLocation;
 
 typedef struct {

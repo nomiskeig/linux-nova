@@ -57,7 +57,7 @@ Trace *get_next_trace(void) {
         "mov %%rax, %0\n\t"
         : "=m"(offset)
 #ifdef TRACER_OVERWRITE_TRACES
-        : "mri"(0x0), "m"(tracebuffer->next_trace_address),
+        : "mri"(0x0), "m"(tracebuffer->offset),
 #else
         : "mr"(sizeof(Trace)), "m"(tracebuffer->offset),
 #endif
@@ -81,7 +81,8 @@ if ((long)address < 0x1000) {
 #ifdef TRACER_LOG_ERROR
 #ifndef TRACER_OVERWRITE_TRACES
     if (tracebuffer->amount > (MAX_AMOUNT_TRACES - 4)) {
-        TRACER_PRINT_ERROR("Tracer buffer ran full, aborting");
+        TRACER_PRINT_ERROR("Tracer buffer ran full, aborting, got %li tracees",
+                           tracebuffer->amount);
     }
 #endif
 #endif
@@ -101,7 +102,8 @@ if ((long)address < 0x1000) {
 #ifdef TRACER_NOVA_SUPPORT
     // TODO: this is racy, but also like why does this crash????, coiuld be
     // becuase int and long types for id
-    trace->id = tracebuffer->amount;
+	// This is -1 becuase we want zero-indexed ids
+    trace->id = tracebuffer->amount -1;
 #endif
     TRACER_PRINT_DEBUG("next address is %lx",
                        (long)offset + (long)&tracebuffer);
@@ -189,9 +191,8 @@ void collect_address(tracer_regs_t regs,
     // trace->address =
     //   (page_to_phys(virt_to_page((void *)address))  - (0x1l << 34)) |
     //   (address & 0xFFF); // trace->address =
-    trace->address =
-        (page_to_phys(virt_to_page((void *)address)) - 134217728) |
-        (address & 0xFFF); // trace->address =
+    trace->address = (page_to_phys(virt_to_page((void *)address)) - 134217728) |
+                     (address & 0xFFF); // trace->address =
 
     // (page_to_phys(vmalloc_to_page((void *) address))) ;//| (address & 0xFFF);
     // trace->address = address;
@@ -344,9 +345,13 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     long start_ticks = rdtsc_fence();
 #endif
 #ifndef TRACER_USERSPACE
-    pr_info("getting trace for instruction %s", instruction->text);
+    // pr_info("getting trace for instruction %s", instruction->text);
 #endif
     Trace *trace = get_next_trace();
+   /* if (trace->id == 295557) {
+        pr_info("is failed with instruction %s", instruction->text);
+    }
+    */
 #ifdef TRACER_PRINT_MEM_TRAMPOLINES
     if (from_trampoline == 1) {
         char text[2];
@@ -369,21 +374,24 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     }
 #endif
     if (instruction->info.attributes & ZYDIS_ATTRIB_HAS_REP) {
-#ifndef TRACER_USERSPACE
-        pr_info("filled a rep prefix");
-#endif
 
-        switch (instruction->info.opcode) {
-        case 0xAA: {
-#ifndef TRACER_USERSPACE
-            pr_info("filled a rep prefix with prefix aa");
-#endif
+        switch (instruction->info.mnemonic) {
+        case ZYDIS_MNEMONIC_STOSB: {
             setRep(trace);
             setRepSize(trace, REP_SIZE_8);
             TRACER_PRINT_DEBUG_PRE("value of rcx: %lx", regs[TRACER_REG_RCX]);
             set_length(trace, regs[TRACER_REG_RCX]);
             TRACER_PRINT_DEBUG_PRE("value of rax: %lx", regs[TRACER_REG_RAX]);
             trace->value = regs[TRACER_REG_RAX] & 0xFF;
+            break;
+        }
+        case ZYDIS_MNEMONIC_STOSQ: {
+            setRep(trace);
+            setRepSize(trace, REP_SIZE_64);
+            TRACER_PRINT_DEBUG_PRE("value of rcx: %lx", regs[TRACER_REG_RCX]);
+            set_length(trace, regs[TRACER_REG_RCX]);
+            TRACER_PRINT_DEBUG_PRE("value of rax: %lx", regs[TRACER_REG_RAX]);
+            trace->value = regs[TRACER_REG_RAX];
             break;
         }
         default:

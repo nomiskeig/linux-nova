@@ -323,10 +323,10 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	int amount_pages_trace = (sizeof(Tracebuffer) / PAGE_SIZE) + 1;
 	int amount_pages_value = (sizeof(Valuebuffer) / PAGE_SIZE) + 1;
 	struct page **page_pointer_tracebuffer =
-		vzalloc(amount_pages_trace * sizeof(struct page *));
+		vmalloc(amount_pages_trace * sizeof(struct page *));
 	struct page **page_pointer_valuebuffer =
-		vzalloc(amount_pages_value * sizeof(struct page *));
-	get_user_pages_unlocked(trace_buffer_address, amount_pages_trace,
+		vmalloc(amount_pages_value * sizeof(struct page *));
+	long res_get_user = get_user_pages_unlocked(trace_buffer_address, amount_pages_trace,
 				page_pointer_tracebuffer, 0);
 	for (int i = 0; i < amount_pages_trace; i++) {
 		if (page_pointer_tracebuffer[i] == NULL) {
@@ -344,7 +344,7 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	tracebuffer = vmap(page_pointer_tracebuffer, amount_pages_trace,
 			   VM_READ | VM_WRITE | VM_READ, PAGE_KERNEL);
 	if (tracebuffer == NULL) {
-		pr_err("could not map the tracebuffer");
+		pr_err("could not map the tracebuffer, could only map %li pages of %i", res_get_user, amount_pages_trace);
 	}
 	valuebuffer = vmap(page_pointer_valuebuffer, amount_pages_value,
 			   VM_READ | VM_WRITE, PAGE_KERNEL);
@@ -377,6 +377,7 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		kmap(page_pointer_valuebuffer[i]);
 	}
 	*/
+	//tracer_kernel_reset();
 	TRACER_PRINT_DEBUG(
 		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px",
 		(void *)base_patch_address, (void *)valuebuffer,
@@ -423,7 +424,8 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	TRACER_PRINT_DEBUG(
 		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px, current offset is %lx",
 		(void *)base_patch_address, (void *)valuebuffer,
-		(void *)tracebuffer, tracebuffer->offset); enable_write_protection();
+		(void *)tracebuffer, tracebuffer->offset);
+	enable_write_protection();
 }
 
 long get_tracebuffer_address(void)

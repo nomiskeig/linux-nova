@@ -40,6 +40,8 @@
 #include <linux/slab.h>
 extern long base_patch_address;
 extern long alternate_stack_address;
+#include <asm/io.h>
+#include <linux/mm.h>
 
 #endif
 extern ThreadMappings *thread_mappings;
@@ -49,6 +51,7 @@ DisplacedInstructions *displaced_instructions;
 extern ZydisDisassembledInstruction *disassembled_instruction;
 extern int id_offset;
 int hook_pthread_create;
+int print_next = 0;
 #ifdef TRACER_ENABLE_MEASUREMENTS
 extern Measurements *measurements;
 #endif
@@ -147,7 +150,6 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
 #ifdef TRACER_PREVENT_LIBC
     use_glibc[thread_index] = 0;
 #endif
-
     ucontext_t *uc = (ucontext_t *)ucontext;
     tracer_regs_t tracer_regs = uc->uc_mcontext.gregs;
     TRACER_PRINT_DEBUG("is in invalid handler\n");
@@ -172,7 +174,7 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
         (unsigned char *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE];
     if (*(addres) == 0xD5) {
 #ifndef TRACER_USERSPACE
-        pr_info("getting trace for fence, flush or hypercall");
+        // pr_info("getting trace for fence, flush or hypercall");
 #endif
         Trace *trace = get_next_trace();
         // fence
@@ -181,8 +183,7 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
             trace->type = TYPE_FENCE;
             trace->mnemonic = 1;
             TRACER_PRINT_DEBUG_NOVA("found fence");
-        }
-        if (*(addres + 1) == 0xD6) {
+        } else if (*(addres + 1) == 0xD6) {
             trace->type = TYPE_FLUSH;
             trace->mnemonic = 1;
             TRACER_PRINT_DEBUG_NOVA("found clwb");
@@ -206,8 +207,7 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
                     "Could not decode the instruction in the signal handler");
             }
             collect_address(tracer_regs, &instruction, trace);
-        }
-        if (*(addres + 1) == 0x06) {
+        } else if (*(addres + 1) == 0x06) {
             trace->type = TYPE_HYPERCALL;
             trace->value = 0l;
             trace->value = (long)tracer_regs[TRACER_REG_RBX];
@@ -332,6 +332,68 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
                 TRACER_DO_TRACE);
             break;
         }
+    }
+    ZyanUSize longest_length = 15;
+    ZydisDisassembledInstruction instruction;
+    ZyanStatus status = ZydisDisassembleIntel(
+        /* machine_mode:    */ ZYDIS_MACHINE_MODE_LONG_64,
+        /* runtime_address: */ tracer_regs[TRACER_REG_RIP_DO_NOT_USE],
+        /* buffer:          */ (void *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE],
+        /* length:          */ longest_length,
+        /* instruction:     */ &instruction);
+
+    if (!ZYAN_SUCCESS(status)) {
+        TRACER_PRINT_ERROR(
+            "Could not decode the instruction in the signal handler");
+    }
+    if (is_write(&instruction) == 0) {
+        //pr_info("setting print next");
+        print_next = 1;
+    }
+    if (is_write(&instruction) == 0 || print_next == 1) {
+        //pr_info("print_next is %x", print_next);
+        if (is_write(&instruction) == 1) {
+            print_next = 0;
+        }
+        long address = 0;
+        for (int i = 0; i < instruction.info.operand_count; i++) {
+            ZydisDecodedOperand *op = &instruction.operands[i];
+            if (op->type != ZYDIS_OPERAND_TYPE_MEMORY) {
+                continue;
+            }
+            TracerRegister base = get_offset_of_reg(op->mem.base);
+            address = tracer_regs[tracer_reg_to_specific_reg_index(base)];
+            if (op->mem.disp.size > 0) {
+                address += op->mem.disp.value;
+            }
+            if (op->mem.index != ZYDIS_REGISTER_NONE) {
+                TracerRegister index = get_offset_of_reg(op->mem.index);
+                address += op->mem.scale *
+                           tracer_regs[tracer_reg_to_specific_reg_index(index)];
+            }
+            // TRACER_PRINT_DEBUG(
+             //    "next print should be the address of virtual address");
+        //TRACER_PRINT_DEBUG("trace->virtual_address is %p, and trace is
+         //   %p",
+            //                   (void *)&trace->virtual_address, (void
+            //                   *)trace);
+            //
+        }
+
+        int pkru;
+        asm("mov $0x0, %%ecx\n\t"
+            "rdpkru\n\t"
+            "mov %%eax, %0"
+            : "=m"(pkru)::"ecx", "eax", "edx");
+
+/*      pr_info("instruction is %s and is write, from rip %lx, address is "
+                "%lx, pkru is %x",
+                instruction.text, tracer_regs[TRACER_REG_RIP_DO_NOT_USE],
+                (page_to_phys(virt_to_page((void *)address)) - 134217728) |
+                    (address & 0xFFF),
+                pkru); // trace->address =
+		// 
+		// */
     }
 
     // support for nova, need to trace sfence, clwb. To do that, we use an
@@ -576,6 +638,7 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
 #endif
     }
 
+	// TODO: this is probably broken
     DisplacedInstructionLocation *loc =
         get_displaced_location_info((long)address, displaced_instructions);
     if (loc && !loc->trampolineInstalled) {
@@ -830,6 +893,9 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
             "Could not decode the instruction in the signal handler");
     }
 
+    if (is_write(&instruction) == 0) {
+        //pr_info("this should not be a read a1: %s", instruction.text);
+    }
 #ifdef TRACER_LOG_DEBUG_SIGNAL_HANDLER
     int length = instruction.info.length;
     TRACER_PRINT_DEBUG_SIGNAL_HANDLER(
