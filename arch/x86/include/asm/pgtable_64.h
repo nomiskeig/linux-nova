@@ -61,8 +61,10 @@ void set_pte_vaddr_pud(pud_t *pud_page, unsigned long vaddr, pte_t new_pte);
 #define PMEM_START (1l << 34)
 #define PMEM_LEN (1l << 32)
 #else
-#define PMEM_START 134217728
+#define PMEM_START 134217728 //this is the pmem0 mapped at 128mb with a size of 5 mb
 #define PMEM_LEN 5242880
+// this is the address in cat /proc/iomem
+//#define PMEM_START	0x380000000000 //this is the pmem2 mapped at 256mb with a size of 5 mb (technically 256mb but we set its size to 5mb in the device we set qemu up with)
 #endif
 
 static inline void native_set_pte(pte_t *ptep, pte_t pte)
