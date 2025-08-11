@@ -1269,15 +1269,13 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 	 * have no user pages in the kernel portion of the address
 	 * space, so do not expect them here.
 	 */
-	pr_info("Got a kernel fault");
 	if (hw_error_code & X86_PF_PK) {
-		pr_info("hw error code: %lx", hw_error_code);
 		ucontext_t ucontext;
 		ucontext.uc_mcontext.gregs =(tracer_regs_t)regs;
+		//pr_info("got address %lx", regs[TRACER_REG_RIP_DO_NOT_USE]);
 		siginfo_t info;
 		info.si_code = SEGV_PKUERR;
 		pku_signal_handler(SIGSEGV, &info, &ucontext);
-		pr_info("Should have called pku_signal_handler");
 		return;
 
 	}
