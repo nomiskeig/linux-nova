@@ -72,3 +72,11 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
 long get_tracebuffer_address(void);
 long get_valuebuffer_address(void);
 void reset_buffers(void);
+
+static __inline__ long rdtsc_self(void) {
+    unsigned long hi, lo;
+    __asm__ __volatile__(
+                         "rdtsc"
+                         : "=a"(lo), "=d"(hi));
+    return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
+}

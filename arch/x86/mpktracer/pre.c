@@ -15,6 +15,8 @@ extern Measurements *measurements;
 #else
 #include <asm/io.h>
 #include <linux/mm.h>
+#include <linux/printk.h>
+#include <linux/sched/debug.h>
 
 #endif
 #include "collector.h"
@@ -102,8 +104,8 @@ if ((long)address < 0x1000) {
 #ifdef TRACER_NOVA_SUPPORT
     // TODO: this is racy, but also like why does this crash????, coiuld be
     // becuase int and long types for id
-	// This is -1 becuase we want zero-indexed ids
-    trace->id = tracebuffer->amount -1;
+    // This is -1 becuase we want zero-indexed ids
+    trace->id = tracebuffer->amount - 1;
 #endif
     TRACER_PRINT_DEBUG("next address is %lx",
                        (long)offset + (long)&tracebuffer);
@@ -191,14 +193,20 @@ void collect_address(tracer_regs_t regs,
     // trace->address =
     //   (page_to_phys(virt_to_page((void *)address))  - (0x1l << 34)) |
     //   (address & 0xFFF); // trace->address =
-    trace->address = (page_to_phys(virt_to_page((void *)address)) - 134217728) |
+#ifndef TRACER_VINTER_INVESTIGATE
+//#define PMEM_START 134217728 //this is the pmem0 mapped at 128mb with a size of 5 mb
+#define PMEM_START 0x540000000
+    trace->address = (page_to_phys(virt_to_page((void *)address)) - PMEM_START) |
                      (address & 0xFFF); // trace->address =
 
+#endif
     // (page_to_phys(vmalloc_to_page((void *) address))) ;//| (address & 0xFFF);
     // trace->address = address;
 
 #else
+#ifndef TRACER_VINTER_INVESTIGATE
     trace->address = address;
+#endif
 #endif
 #endif
     // TRACER_PRINT_DEBUG("set virtual address of instruction");
@@ -348,10 +356,10 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     // pr_info("getting trace for instruction %s", instruction->text);
 #endif
     Trace *trace = get_next_trace();
-   /* if (trace->id == 295557) {
-        pr_info("is failed with instruction %s", instruction->text);
-    }
-    */
+    /* if (trace->id == 295557) {
+         pr_info("is failed with instruction %s", instruction->text);
+     }
+     */
 #ifdef TRACER_PRINT_MEM_TRAMPOLINES
     if (from_trampoline == 1) {
         char text[2];
@@ -373,6 +381,18 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
         trace->address = 0l;
     }
 #endif
+#ifdef TRACER_VINTER_INVESTIGATE
+    trace->timestamp = rdtsc_self();
+    trace->origin_address = rip_of_instruction;
+#endif
+    if (instruction == NULL) {
+        TRACER_PRINT_ERROR("instruction pointer is NULL");
+    }
+    if (instruction->info.mnemonic == ZYDIS_MNEMONIC_MOVNTI) {
+        trace->non_temporal = 1;
+    } else {
+        trace->non_temporal = 0;
+    }
     if (instruction->info.attributes & ZYDIS_ATTRIB_HAS_REP) {
 
         switch (instruction->info.mnemonic) {
@@ -438,6 +458,18 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     TRACER_PRINT_DEBUG_CONTEXT("RIP: %016llx", regs[TRACER_REG_RIP_DO_NOT_USE]);
 #endif
 #ifdef TRACER_NOVA_SUPPORT
+#ifdef TRACER_USERSPACE
+    trace->in_kernel = 0;
+
+#else
+    trace->in_kernel = 1;
+#endif
+
+    if (rip_of_instruction == 0xffffffff8138be09) {
+        pr_info("printing stack");
+        show_stack(NULL, (long unsigned int *)regs[TRACER_REG_RSP]);
+    }
+    trace->origin_address = rip_of_instruction;
     if (is_write(instruction)) {
 
 #ifdef TRACER_TRACE_KERNEL

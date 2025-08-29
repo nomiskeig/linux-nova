@@ -73,9 +73,16 @@ typedef struct {
     int id;
     int non_temporal;
     long value_size_and_location;
-    long value;
-    long address;
     long flags;
+    long value;
+	#ifdef TRACER_VINTER_INVESTIGATE
+	long timestamp;
+	long origin_address;
+	#else
+    long address;
+    long in_kernel;
+	long origin_address;
+#endif
 } Trace;
 #endif
 #endif
@@ -86,9 +93,9 @@ typedef
 
 #ifdef TRACER_USERSPACE
 // THIS needs to be changed back sas well as the other value below
-#define MAX_AMOUNT_TRACES ((1l << 24) / sizeof(Trace))
+#define MAX_AMOUNT_TRACES (((1l << 24) + (1l << 23)) / sizeof(Trace))
 #else
-#define MAX_AMOUNT_TRACES ((1l << 24) / sizeof(Trace))
+#define MAX_AMOUNT_TRACES (((1l << 24)  + (1l << 23))/ sizeof(Trace))
 #endif
 
     struct {

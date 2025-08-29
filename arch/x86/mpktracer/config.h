@@ -134,6 +134,7 @@
 #define TRACER_VM
 #define TRACER_SUPPORT_CUSTOM_INVALID
 #define TRACER_VINTER
+//#define TRACER_VINTER_INVESTIGATE
 ////
 ///
 ///OPTIMIZATIONS
@@ -151,7 +152,7 @@
 //#define TRACER_USE_SPINLOCK_FOR_ADDRESS // uses a pthread spin lock instead of spining when getting the next address
 //#define TRACER_USE_MUTEX_FOR_ADDRESS // uses a pthread mutex instead of spining when getting the next address
 //#define TRACER_ALLIGN_ALL // instead of calculating the address for the next value in a way that just works, this will just always increase the address by 256 bytes
-//#define TRACER_NO_HANDLER_SAVE_RESTORE
+#define TRACER_NO_HANDLER_SAVE_RESTORE
 //
 //
 //

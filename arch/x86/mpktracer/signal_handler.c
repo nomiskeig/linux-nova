@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/ucontext.h>
+#include <asm/msr.h>
 #else
 #include "config.h"
 #include "context.h"
@@ -35,9 +36,11 @@
 #include "pthread.h"
 #include "register.h"
 #include "regs.h"
+#include "rdtsc.h"
 #include "trampoline.h"
 #include <Zydis.h>
 #include <linux/slab.h>
+#include <linux/sched/debug.h>
 extern long base_patch_address;
 extern long alternate_stack_address;
 #include <asm/io.h>
@@ -47,7 +50,7 @@ extern long alternate_stack_address;
 extern ThreadMappings *thread_mappings;
 extern Tracebuffer *tracebuffer;
 extern Valuebuffer *valuebuffer;
-DisplacedInstructions *displaced_instructions;
+DisplacedInstructions *displaced_instructions = NULL;
 extern ZydisDisassembledInstruction *disassembled_instruction;
 extern int id_offset;
 int hook_pthread_create;
@@ -89,6 +92,30 @@ void log_address_space() {
 }
 #endif
 
+		/*
+		if (tracer_can_handle(address)) {
+			//pr_info("found invalid instruction, value is %hxx", *address);
+			invalid_instr_signal_handler(0, &info, &ucontext);
+			return;
+		} else {
+			//pr_info("blocked away invalid instruction with value %hhx, second byte %hhx at address 0x%lx", *address, *(address + 1), address);
+			if (*address == 0x0F && *(address + 1) == 0x0B) {
+				// this is an official invalid instruction, so let it through i guess
+
+			} else {
+				if (*address == 0xD5) {
+					// this is one of our traps, skip two, otherwise skip one
+				regs->ip += 2;
+
+				} else {
+					regs->ip += 1;
+				}
+				return;
+
+			}
+
+		}
+		*/
 #ifdef TRACER_LOG_PROTECTED_BUFFER
 void log_buffer() {
     char *address = mmap_info->address;
@@ -172,6 +199,7 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
 
     unsigned char *addres =
         (unsigned char *)tracer_regs[TRACER_REG_RIP_DO_NOT_USE];
+	// 0xD5 denotes a trap we installed ourselves
     if (*(addres) == 0xD5) {
 #ifndef TRACER_USERSPACE
         // pr_info("getting trace for fence, flush or hypercall");
@@ -182,6 +210,8 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
             // for now we can assume that the only fence we find is an sfence
             trace->type = TYPE_FENCE;
             trace->mnemonic = 1;
+			//pr_info("found fence instruction at address 0x%lx and id %i", addres, trace->id);
+			//show_stack(NULL, (long unsigned int *)tracer_regs[TRACER_REG_RSP]);
             TRACER_PRINT_DEBUG_NOVA("found fence");
         } else if (*(addres + 1) == 0xD6) {
             trace->type = TYPE_FLUSH;
@@ -284,7 +314,10 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
 }
 
 void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
+
+	//long before_all = rdtsc_ordered();
     TRACER_PRINT_DEBUG("is in signal handler\n");
+	//long before = rdtsc_ordered();
 #ifdef TRACER_MEASURE_SIGNAL_HANDLER
     long ticks_handler_start = rdtsc();
 #endif
@@ -317,6 +350,11 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
         tracer_regs[TRACER_REG_RIP_DO_NOT_USE]) {
         is_tracing_following = 1;
     }
+
+	//pr_info("beginning: %li", rdtsc_ordered()-before);
+	//long before1 = rdtsc_ordered();
+	
+	//long before = rdtsc_self();
     for (int i = 0; i < MAX_SUPPORTED_THREADS; i++) {
         if (thread_mappings->mappings[i].following_info.expected_new_address ==
             tracer_regs[TRACER_REG_RIP_DO_NOT_USE]) {
@@ -333,6 +371,17 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
             break;
         }
     }
+	
+	//long after = rdtsc_self();
+	//pr_info("Disassembly: %li", after - before);
+	/*pr_info("rdtsc: %li", rdtsc_self());
+	pr_info("rdtsc: %li", rdtsc_self());
+	pr_info("rdtsc: %li", rdtsc_self());
+	pr_info("rdtsc: %li", rdtsc_self());*/
+	//long after1 = rdtsc_self();
+	//long after2 = rdtsc_self();
+	//pr_info("Search: %li",after1 - before1);
+	//pr_info("Search: %li",after2 - before1);
     ZyanUSize longest_length = 15;
     ZydisDisassembledInstruction instruction;
     ZyanStatus status = ZydisDisassembleIntel(
@@ -346,10 +395,12 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
         TRACER_PRINT_ERROR(
             "Could not decode the instruction in the signal handler");
     }
+	//before = rdtsc_ordered();
     if (is_write(&instruction) == 0) {
         //pr_info("setting print next");
         print_next = 1;
     }
+
     if (is_write(&instruction) == 0 || print_next == 1) {
         //pr_info("print_next is %x", print_next);
         if (is_write(&instruction) == 1) {
@@ -386,6 +437,7 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
             "mov %%eax, %0"
             : "=m"(pkru)::"ecx", "eax", "edx");
 
+	
 /*      pr_info("instruction is %s and is write, from rip %lx, address is "
                 "%lx, pkru is %x",
                 instruction.text, tracer_regs[TRACER_REG_RIP_DO_NOT_USE],
@@ -395,6 +447,7 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
 		// 
 		// */
     }
+//	pr_info("Write debug: %li", rdtsc_ordered() -before);
 
     // support for nova, need to trace sfence, clwb. To do that, we use an
     // invalid instruction, 0xD5. Then we have at least 4 bytes that we can use
@@ -409,6 +462,7 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
     TRACER_PRINT_DEBUG_SIGNAL_HANDLER("is_tracing following: %i",
                                       is_tracing_following);
     if (info->si_code != SEGV_PKUERR && is_tracing_following == 0) {
+	//before= rdtsc_ordered();
         // just crash it so that we get a crash dump
         TRACER_PRINT_DEBUG_SIGNAL_HANDLER(
             "Err cause not pku err wiht the following context and si_code %i",
@@ -499,9 +553,11 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
 #ifdef TRACER_PREVENT_LIBC
         use_glibc[thread_index] = 1;
 #endif
+	//pr_info("error: %li", rdtsc_ordered() - before);
         return;
     }
 #ifdef TRACER_USE_TRAMPOLINES
+	//before = rdtsc_ordered();
 #ifdef TRACER_USERSPACE
     // TODO: this shoudl use the correct pkey, but using it destroys  w
     int used_key = 1; // atoi(getenv("TRACER_PKEY"));
@@ -723,6 +779,7 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
 
 #endif
     TRACER_PRINT_DEBUG("after installing trampoline 2");
+	//pr_info("trampoline %lx", rdtsc_ordered() - before);
     return;
 #endif
 #ifdef TRACER_MEASURE_SIGNAL_HANDLER
@@ -731,7 +788,11 @@ void pku_signal_handler(int number, siginfo_t *info, void *ucontext) {
 #ifdef TRACER_ENABLE_HANDLER_THREADS
     measurements->fault_signal_handler[thread_index] += end_ticks - start_ticks;
 #endif
+///before = rdtsc_ordered();
     tracer_core_handler(number, info, ucontext, 0);
+	//long t = rdtsc_self();
+	//pr_info("Core handler all: %li", t - before);
+	//pr_info("After full handler: %li", t - before_all);
 
 #endif
 }
@@ -1196,9 +1257,11 @@ void tracer_core_handler(int number, siginfo_t *info, void *ucontext,
     long value_address = 0;
 
     if (is_following == 0 || following_must_be_traced == TRACER_DO_TRACE) {
+	//long before_pre = rdtsc_self();
         value_address = collect_pre(tracer_regs, &instruction, 0,
                                     tracer_regs[TRACER_REG_RIP_DO_NOT_USE]);
-        TRACER_PRINT_DEBUG("value address is %p", (void *)value_address);
+	//	pr_info("Pre: %li", rdtsc_self()- before_pre);
+        //TRACER_PRINT_DEBUG("value address is %p", (void *)value_address);
     }
 
 #ifdef TRACER_LOG_DEBUG_SIGNAL_HANDLER

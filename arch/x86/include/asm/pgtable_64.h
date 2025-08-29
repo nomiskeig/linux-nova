@@ -61,10 +61,10 @@ void set_pte_vaddr_pud(pud_t *pud_page, unsigned long vaddr, pte_t new_pte);
 #define PMEM_START (1l << 34)
 #define PMEM_LEN (1l << 32)
 #else
-#define PMEM_START 134217728 //this is the pmem0 mapped at 128mb with a size of 5 mb
+//#define PMEM_START 134217728 //this is the pmem0 mapped at 128mb with a size of 5 mb
 #define PMEM_LEN 5242880
-// this is the address in cat /proc/iomem
-//#define PMEM_START	0x380000000000 //this is the pmem2 mapped at 256mb with a size of 5 mb (technically 256mb but we set its size to 5mb in the device we set qemu up with)
+// this is the address in cat /proc/iomem  
+#define PMEM_START 0x540000000
 #endif
 
 static inline void native_set_pte(pte_t *ptep, pte_t pte)
@@ -94,7 +94,7 @@ static inline void native_set_pte_atomic(pte_t *ptep, pte_t pte)
 static inline void native_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	// this seems to do absolutly nothing, which is sad becuase i dont know where stuff is mapped then
-	unsigned long physical_address = pmd_pfn(pmd) << PAGE_SHIFT;
+	/*unsigned long physical_address = pmd_pfn(pmd) << PAGE_SHIFT;
 	if (physical_address >= (1l << 34) &&
 
 	    physical_address < ((1l << 34) + (1l << 32))) {
@@ -102,6 +102,7 @@ static inline void native_set_pmd(pmd_t *pmdp, pmd_t pmd)
 					     (1l << _PAGE_BIT_PKEY_BIT0)) };
 		pr_info("protected memory at %lx via pmd entry", physical_address);
 	}
+	*/
 	WRITE_ONCE(*pmdp, pmd);
 }
 

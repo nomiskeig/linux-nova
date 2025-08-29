@@ -12,6 +12,11 @@
 
 #include <Zydis.h>
 #include <linux/highmem.h>
+#include <linux/relay.h>
+#include <linux/debugfs.h>
+#define SUBBUF_SIZE 262144
+#define N_SUBBUFS 4
+struct rchan *mpk_tracer_debug_channel;
 
 Tracebuffer *tracebuffer;
 Valuebuffer *valuebuffer;
@@ -38,7 +43,6 @@ TraceAddresses *trace_addresses;
 	return address;
 }
 */
-
 
 /*static void log_mappings(struct mm_struct *mm) {
 	pgd_t *pgd;
@@ -205,7 +209,7 @@ void set_pks_bit(int a)
 			     : /* no input */
 			     : "%rax");
 	//pr_info("cr4 after: 0x: %x", cr4);
-// see  https://patchwork.kernel.org/project/linux-kselftest/patch/20201022222701.887660-4-ira.weiny@intel.com/
+	// see  https://patchwork.kernel.org/project/linux-kselftest/patch/20201022222701.887660-4-ira.weiny@intel.com/
 	//if (!cpu_feature_enabled(16*32 + 31))  {
 	//   pr_info("pks feature not available\n");
 	//  return;
@@ -222,7 +226,8 @@ void set_pks_bit(int a)
 	//asm("MOV %r12, %cr4");
 }
 
-void disable_smap(void)  {
+void disable_smap(void)
+{
 	u32 cr4;
 	__asm__ __volatile__("mov %%cr4, %%rax\n\t"
 			     "mov %%eax, %0\n\t"
@@ -236,7 +241,6 @@ void disable_smap(void)  {
 			   :
 			   : "m"(cr4)
 			   : "rax");
-
 }
 void disable_write_protection(void)
 {
@@ -282,15 +286,47 @@ void enable_write_protection(void)
 			   : "m"(cr0)
 			   : "rax");
 }
-void tracer_kernel_reset(void) {
+void tracer_kernel_reset(void)
+{
 	reset_buffers();
 	vfree(displaced_instructions);
-	displaced_instructions =
-		(DisplacedInstructions *)vzalloc(sizeof(DisplacedInstructions));
+	if (displaced_instructions == NULL) {
+		pr_info("setting displaced instructions");
+		displaced_instructions = (DisplacedInstructions *)vzalloc(
+			sizeof(DisplacedInstructions));
+	}
 	vfree(allocator);
 	allocator = (Allocator *)vzalloc(sizeof(Allocator));
-
 }
+/*
+* create_buf_file() callback.  Creates relay file in debugfs.
+*/
+static struct dentry *
+create_buf_file_handler(const char *filename, struct dentry *parent,
+			umode_t mode, struct rchan_buf *buf, int *is_global)
+{
+	*is_global = 1;
+	return debugfs_create_file(filename, mode, parent, buf,
+				   &relay_file_operations);
+}
+
+/*
+* remove_buf_file() callback.  Removes relay file from debugfs.
+*/
+static int remove_buf_file_handler(struct dentry *dentry)
+{
+	debugfs_remove(dentry);
+
+	return 0;
+}
+
+/*
+* relay interface callbacks
+*/
+static struct rchan_callbacks relay_callbacks = {
+	.create_buf_file = create_buf_file_handler,
+	.remove_buf_file = remove_buf_file_handler,
+};
 
 void tracer_kernel_init(unsigned long trace_buffer_address,
 			unsigned long value_buffer_address)
@@ -326,8 +362,10 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		vmalloc(amount_pages_trace * sizeof(struct page *));
 	struct page **page_pointer_valuebuffer =
 		vmalloc(amount_pages_value * sizeof(struct page *));
-	long res_get_user = get_user_pages_unlocked(trace_buffer_address, amount_pages_trace,
-				page_pointer_tracebuffer, 0);
+	long res_get_user =
+		get_user_pages_unlocked(trace_buffer_address,
+					amount_pages_trace,
+					page_pointer_tracebuffer, 0);
 	for (int i = 0; i < amount_pages_trace; i++) {
 		if (page_pointer_tracebuffer[i] == NULL) {
 			pr_err("Page %i is zero pointer", i);
@@ -344,7 +382,8 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	tracebuffer = vmap(page_pointer_tracebuffer, amount_pages_trace,
 			   VM_READ | VM_WRITE | VM_READ, PAGE_KERNEL);
 	if (tracebuffer == NULL) {
-		pr_err("could not map the tracebuffer, could only map %li pages of %i", res_get_user, amount_pages_trace);
+		pr_err("could not map the tracebuffer, could only map %li pages of %i",
+		       res_get_user, amount_pages_trace);
 	}
 	valuebuffer = vmap(page_pointer_valuebuffer, amount_pages_value,
 			   VM_READ | VM_WRITE, PAGE_KERNEL);
@@ -383,6 +422,9 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		(void *)base_patch_address, (void *)valuebuffer,
 		(void *)tracebuffer);
 
+	mpk_tracer_debug_channel =
+		relay_open("mpktracer", NULL, SUBBUF_SIZE, N_SUBBUFS,
+			   &relay_callbacks, NULL);
 	// TODO: this needs to be activated if the tracer runs standalone in the kernel and is not used in tandom with the userspace
 	// but if it is used with the usersapce the buffer is initialized in the inject.c file
 	//tracebuffer->next_trace_address = (void *)&tracebuffer->traces[0];
@@ -406,8 +448,10 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 
 	thread_mappings =
 		(ThreadMappings *)kzalloc(sizeof(ThreadMappings), GFP_KERNEL);
-	displaced_instructions =
-		(DisplacedInstructions *)vzalloc(sizeof(DisplacedInstructions));
+	if (displaced_instructions == NULL) {
+		displaced_instructions = (DisplacedInstructions *)vzalloc(
+			sizeof(DisplacedInstructions));
+	}
 	allocator = (Allocator *)vzalloc(sizeof(Allocator));
 	//base_patch_address = (long)kzalloc(4096, GFP_KERNEL);
 	//base_patch_address = (long)vmalloc(4096);
@@ -441,7 +485,8 @@ void reset_buffers(void)
 	TRACER_PRINT_DEBUG("Resetting buffers");
 	valuebuffer->next_offset = 0;
 	tracebuffer->amount = 0;
-	tracebuffer->offset = (long)&tracebuffer + (long)(&tracebuffer->traces[0]);
+	tracebuffer->offset =
+		(long)&tracebuffer->traces[0] - (long)&tracebuffer;
 }
 
 EXPORT_SYMBOL(tracer_kernel_init);

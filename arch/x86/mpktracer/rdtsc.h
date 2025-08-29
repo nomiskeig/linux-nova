@@ -17,6 +17,7 @@ static __inline__ long rdtsc_fence(void) {
 
     return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
 }
+#ifdef TRACER_USERSPACE
 static __inline__ long rdtsc_self(void) {
     unsigned long hi, lo;
     __asm__ __volatile__(
@@ -24,6 +25,7 @@ static __inline__ long rdtsc_self(void) {
                          : "=a"(lo), "=d"(hi));
     return ((unsigned long long)lo) | (((unsigned long long)hi) << 32);
 }
+#endif
 
 double ticks_to_absolute_seconds(long ticks);
 double duration_to_seconds(long start_tick, long end_tick);
