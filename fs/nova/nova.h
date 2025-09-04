@@ -46,6 +46,7 @@
 #include <linux/version.h>
 #include <linux/pfn_t.h>
 #include <linux/pagevec.h>
+#include <linux/types.h>
 
 #include "nova_def.h"
 #include "stats.h"
@@ -62,6 +63,8 @@
 #undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #endif
+void *nova_memset(void *s, int c, size_t n);
+//#define nova_memset(a,b,c) memset(a,b,c)
 
 /* #define nova_dbg(s, args...)		pr_debug(s, ## args) */
 #define nova_dbg(s, args ...)		pr_info(s, ## args)

@@ -163,7 +163,7 @@ static unsigned int nova_init_dentry(struct super_block *sb,
 
 
 	de_len = NOVA_DIR_LOG_REC_LEN(1);
-	memset(de_entry, 0, de_len);
+	nova_memset(de_entry, 0, de_len);
 	de_entry->entry_type = DIR_LOG;
 	de_entry->epoch_id = epoch_id;
 	de_entry->trans_id = 0;
@@ -182,7 +182,7 @@ static unsigned int nova_init_dentry(struct super_block *sb,
 
 	de_entry = (struct nova_dentry *)((char *)de_entry + length);
 	de_len = NOVA_DIR_LOG_REC_LEN(2);
-	memset(de_entry, 0, de_len);
+	nova_memset(de_entry, 0, de_len);
 	de_entry->entry_type = DIR_LOG;
 	de_entry->epoch_id = epoch_id;
 	de_entry->trans_id = 0;

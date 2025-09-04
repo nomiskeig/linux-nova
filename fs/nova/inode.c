@@ -998,7 +998,7 @@ int nova_delete_dead_inode(struct super_block *sb, u64 ino)
 	if (pi_addr == 0)
 		return -EACCES;
 
-	memset(&si, 0, sizeof(struct nova_inode_info));
+	nova_memset(&si, 0, sizeof(struct nova_inode_info));
 	err = nova_rebuild_inode(sb, &si, ino, pi_addr, 0);
 	if (err)
 		return err;

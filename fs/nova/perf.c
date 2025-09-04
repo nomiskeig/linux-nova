@@ -286,7 +286,7 @@ static void *nova_alloc_vmem_pool(size_t poolsize)
 		return NULL;
 
 	/* init pool to verify some checksum results */
-	// memset(pool, 0xAC, poolsize);
+	// nova_memset(pool, 0xAC, poolsize);
 
 	/* to have a clean start, flush the data cache for the given virtual
 	 * address range in the vmap area

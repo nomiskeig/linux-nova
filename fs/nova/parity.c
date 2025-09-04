@@ -96,7 +96,7 @@ static int nova_update_block_parity(struct super_block *sb, u8 *block,
 	}
 
 	if (unlikely(zero))
-		memset(parity, 0, strp_size);
+		nova_memset(parity, 0, strp_size);
 	else
 		nova_calculate_block_parity(sb, parity, block);
 

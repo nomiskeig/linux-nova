@@ -406,6 +406,7 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
             break;
         }
         case ZYDIS_MNEMONIC_STOSQ: {
+				pr_info("found rep stosq");
             setRep(trace);
             setRepSize(trace, REP_SIZE_64);
             TRACER_PRINT_DEBUG_PRE("value of rcx: %lx", regs[TRACER_REG_RCX]);
@@ -465,10 +466,6 @@ long collect_pre(tracer_regs_t regs, ZydisDisassembledInstruction *instruction,
     trace->in_kernel = 1;
 #endif
 
-    if (rip_of_instruction == 0xffffffff8138be09) {
-        pr_info("printing stack");
-        show_stack(NULL, (long unsigned int *)regs[TRACER_REG_RSP]);
-    }
     trace->origin_address = rip_of_instruction;
     if (is_write(instruction)) {
 

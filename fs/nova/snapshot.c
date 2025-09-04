@@ -508,7 +508,7 @@ static int nova_append_snapshot_file_write_entry(struct super_block *sb,
 			nvmm, num_pages, delete_epoch_id,
 			info->epoch_id);
 
-	memset(&entry, 0, sizeof(struct snapshot_file_write_entry));
+	nova_memset(&entry, 0, sizeof(struct snapshot_file_write_entry));
 	entry.type = SS_FILE_WRITE;
 	entry.deleted = 0;
 	entry.nvmm = nvmm;
@@ -556,7 +556,7 @@ static int nova_append_snapshot_inode_entry(struct super_block *sb,
 			pi->nova_ino, pi->delete_epoch_id,
 			info->epoch_id);
 
-	memset(&entry, 0, sizeof(struct snapshot_inode_entry));
+	nova_memset(&entry, 0, sizeof(struct snapshot_inode_entry));
 	entry.type = SS_INODE;
 	entry.deleted = 0;
 	entry.nova_ino = pi->nova_ino;

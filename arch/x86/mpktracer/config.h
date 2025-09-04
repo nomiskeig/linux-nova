@@ -79,7 +79,7 @@
 // on a trampoline but is an invalid instruction in the program
 //#define TRACER_TRACE_SUBSEQUENT // enables the probe that allows us to decide wether we have to trace a subequent instruciton
 //#define TRACER_COLLECT_TRAMPOLINE_STATISTICS
-//#define TRACER_USE_TRAMPOLINES
+#define TRACER_USE_TRAMPOLINES
 //
 #ifdef TRACER_USERSPACE
 #define disable_pkey(X) pkey_set(X, 0)

@@ -61,7 +61,7 @@ static inline int nova_handle_partial_block(struct super_block *sb,
 	if (entry == NULL) {
 		/* Fill zero */
 		if (support_clwb)
-			memset(kmem + offset, 0, length);
+			nova_memset(kmem + offset, 0, length);
 		else
 			memcpy_to_pmem_nocache(kmem + offset,
 					sbi->zeroed_page, length);
@@ -248,7 +248,7 @@ void nova_init_file_write_entry(struct super_block *sb,
 	u64 epoch_id, u64 pgoff, int num_pages, u64 blocknr, u32 time,
 	u64 file_size)
 {
-	memset(entry, 0, sizeof(struct nova_file_write_entry));
+	nova_memset(entry, 0, sizeof(struct nova_file_write_entry));
 	entry->entry_type = FILE_WRITE;
 	entry->reassigned = 0;
 	entry->updating = 0;
@@ -339,7 +339,7 @@ int nova_protect_file_data(struct super_block *sb, struct inode *inode,
 			if (ret < 0)
 				goto out;
 		} else {
-			memset(blockbuf, 0, offset);
+			nova_memset(blockbuf, 0, offset);
 		}
 
 		/* copying existing checksums from nvmm can be even slower than
@@ -410,7 +410,7 @@ eblk:
 			if (ret < 0)
 				goto out;
 		} else {
-			memset(blockbuf + eblk_offset, 0,
+			nova_memset(blockbuf + eblk_offset, 0,
 				blocksize - eblk_offset);
 		}
 
@@ -1148,7 +1148,7 @@ static int nova_append_write_mmap_to_log(struct super_block *sb,
 	epoch_id = nova_get_epoch_id(sb);
 	update.tail = update.alter_tail = 0;
 
-	memset(&data, 0, sizeof(struct nova_mmap_entry));
+	nova_memset(&data, 0, sizeof(struct nova_mmap_entry));
 	data.entry_type = MMAP_WRITE;
 	data.epoch_id = epoch_id;
 	data.pgoff = cpu_to_le64(vma->vm_pgoff);

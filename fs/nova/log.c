@@ -428,7 +428,7 @@ static int nova_append_log_entry(struct super_block *sb,
 	entry = nova_get_block(sb, curr_p);
 	/* inode is already updated with attr */
 	nova_memunlock_range(sb, entry, size, &irq_flags);
-	memset(entry, 0, size);
+	nova_memset(entry, 0, size);
 	nova_update_log_entry(sb, inode, entry, entry_info);
 	nova_inc_page_num_entries(sb, curr_p);
 	nova_memlock_range(sb, entry, size, &irq_flags);
@@ -443,7 +443,7 @@ static int nova_append_log_entry(struct super_block *sb,
 
 		alter_entry = nova_get_block(sb, alter_curr_p);
 		nova_memunlock_range(sb, alter_entry, size, &irq_flags);
-		memset(alter_entry, 0, size);
+		nova_memset(alter_entry, 0, size);
 		nova_update_log_entry(sb, inode, alter_entry, entry_info);
 		nova_memlock_range(sb, alter_entry, size, &irq_flags);
 

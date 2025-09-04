@@ -208,6 +208,23 @@ void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext) {
         // fence
         if (*(addres + 1) == 0xEA) {
             // for now we can assume that the only fence we find is an sfence
+            ZyanUSize longest_length = 15;
+            ZydisDisassembledInstruction instruction;
+            ZyanStatus status = ZydisDisassembleIntel(
+                /* machine_mode:    */ ZYDIS_MACHINE_MODE_LONG_64,
+                /* runtime_address: */ tracer_regs[TRACER_REG_RIP_DO_NOT_USE] +
+                    2,
+                /* buffer:          */ (void *)addres + 2,
+                /* length:          */ longest_length,
+                /* instruction:     */ &instruction);
+
+            if (instruction.info.mnemonic != ZYDIS_MNEMONIC_SFENCE) {
+                TRACER_PRINT_ERROR("Did not decode a sfence instruction");
+            }
+            if (!ZYAN_SUCCESS(status)) {
+                TRACER_PRINT_ERROR(
+                    "Could not decode the instruction in the signal handler");
+            }
             trace->type = TYPE_FENCE;
             trace->mnemonic = 1;
 			//pr_info("found fence instruction at address 0x%lx and id %i", addres, trace->id);

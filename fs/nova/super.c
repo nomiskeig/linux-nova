@@ -429,7 +429,7 @@ static struct nova_inode *nova_init(struct super_block *sb,
 	pi->nova_ino = NOVA_SNAPSHOT_INO;
 	nova_flush_buffer(pi, CACHELINE_SIZE, 1);
 
-	memset(&update, 0, sizeof(struct nova_inode_update));
+	nova_memset(&update, 0, sizeof(struct nova_inode_update));
 	nova_update_inode(sb, &sbi->snapshot_si->vfs_inode, pi, &update, 1);
 
 	nova_memlock_reserved(sb, super, &irq_flags);
