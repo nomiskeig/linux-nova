@@ -271,7 +271,8 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 	 * WARN*()s end up here; fix them up before we call the
 	 * notifier chain.
 	 */
-	if (!user_mode(regs) && signr == SIGILL) {
+  // this can't be kernel space because then we do not handle the invalid instructions from hypercall
+	if (signr == SIGILL) {
 		ucontext_t ucontext;
 		ucontext.uc_mcontext.gregs = (tracer_regs_t)regs;
 		siginfo_t info;
