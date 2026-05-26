@@ -32,9 +32,9 @@ enum {
 	TRACER_REG_RDX,
 	TRACER_REG_RSI,
 	TRACER_REG_RDI,
-	__unused__,
+	UNUSED1,
 	TRACER_REG_RIP_DO_NOT_USE,
-	__unused2__,
+    UNUSED2,
 	TRACER_REG_FLAGS,
 	TRACER_REG_RSP
 	// TODO: we need the flags register
@@ -63,8 +63,9 @@ typedef struct {
 #define SEGV_PKUERR 4
 //void enable_rw_prot(long pkey, int kind);
 //void disable_rw_prot(long pkey);
-void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext);
-void invalid_instr_signal_handler(int number, siginfo_t *info, void *ucontext);
+void sigill_handler(int number, siginfo_t *info, void *ucontext);
+void sigsegv_handler(int number, siginfo_t *info, void *ucontext);
+
 int tracer_can_handle(long address);
 void pku_signal_handler(int number, siginfo_t *info, void *ucontext);
 void tracer_core_handler(int number, siginfo_t *info, void *ucontext,

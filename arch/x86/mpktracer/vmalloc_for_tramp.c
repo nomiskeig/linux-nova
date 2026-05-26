@@ -10,12 +10,11 @@
 #include "../../mm/pgalloc-track.h"
 #include "vmalloc_for_tramp.h"
 #include "../../mm/internal.h"
-#include "logging.h"
 
 #define UNSET_XD_BIT(X) (X & ~(1l << 63))
 #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
 static unsigned int __ro_after_init ioremap_max_page_shift = BITS_PER_LONG - 1;
-
+#define TRACER_PRINT_DEBUG_TRAMPOLINES(x, y) 
 static int __init set_nohugeiomap(char *str)
 {
 	ioremap_max_page_shift = PAGE_SHIFT;
@@ -36,13 +35,13 @@ static int vmap_pte_range_for_trampoline(pmd_t *pmd, unsigned long addr, unsigne
 	pfn = phys_addr >> PAGE_SHIFT;
 	pte = pte_alloc_kernel_track(pmd, addr, mask);
 	if (!pte) {
-	TRACER_PRINT_DEBUG_TRAMPOLINES("pte error");
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("pte error");
 		return -ENOMEM;
 	}
 	do {
 		if (unlikely(!pte_none(ptep_get(pte)))) {
 			if (pfn_valid(pfn)) {
-				TRACER_PRINT_DEBUG_TRAMPOLINES("returning -1");
+		//		TRACER_PRINT_DEBUG_TRAMPOLINES("returning -1");
 				return -1;
 			}
 		}
@@ -96,7 +95,7 @@ static int vmap_pmd_range_for_trampoline(pud_t *pud, unsigned long addr, unsigne
 
 	if (!pmd)  {
 
-	TRACER_PRINT_DEBUG_TRAMPOLINES("pmd error");
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("pmd error");
 		return -ENOMEM;
 	}
 	do {
@@ -112,7 +111,7 @@ static int vmap_pmd_range_for_trampoline(pud_t *pud, unsigned long addr, unsigne
 
 		if (vmap_pte_range_for_trampoline(pmd, addr, next, phys_addr, prot, max_page_shift, mask)) {
 
-			TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_pmd_range_for_trampolines");
+			//TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_pmd_range_for_trampolines");
 			return -ENOMEM;
 		}
 	} while (pmd++, phys_addr += (next - addr), addr = next, addr != end);
@@ -153,7 +152,7 @@ static int vmap_pud_range_for_trampoline(p4d_t *p4d, unsigned long addr, unsigne
 
 	pud = pud_alloc_track(&init_mm, p4d, addr, mask);
 	if (!pud) {
-	TRACER_PRINT_DEBUG_TRAMPOLINES("pud error");
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("pud error");
 		return -ENOMEM;
 	}
 	do {
@@ -170,7 +169,7 @@ static int vmap_pud_range_for_trampoline(p4d_t *p4d, unsigned long addr, unsigne
 		if (vmap_pmd_range_for_trampoline(pud, addr, next, phys_addr, prot,
 					max_page_shift, mask)) {
 
-			TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_pud_range_for_trampolines");
+			//TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_pud_range_for_trampolines");
 			return -ENOMEM;
 		}
 	} while (pud++, phys_addr += (next - addr), addr = next, addr != end);
@@ -212,7 +211,7 @@ static int vmap_p4d_range_for_trampoline(pgd_t *pgd, unsigned long addr, unsigne
 	p4d = p4d_alloc_track(&init_mm, pgd, addr, mask);
 
 	if (!p4d) {
-	TRACER_PRINT_DEBUG_TRAMPOLINES("p4d error");
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("p4d error");
 		return -ENOMEM;
 	}
 	do {
@@ -229,11 +228,11 @@ static int vmap_p4d_range_for_trampoline(pgd_t *pgd, unsigned long addr, unsigne
 		if (vmap_pud_range_for_trampoline(p4d, addr, next, phys_addr, prot,
 					max_page_shift, mask)) {
 
-			TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_p4d_range_for_trampolines");
+			//TRACER_PRINT_DEBUG_TRAMPOLINES("error in innre vmap_p4d_range_for_trampolines");
 			return -ENOMEM;
 		}
 	} while (p4d++, phys_addr += (next - addr), addr = next, addr != end);
-			TRACER_PRINT_DEBUG_TRAMPOLINES("returning 0 in vmap_p4d_range_for_trampoline");
+			//TRACER_PRINT_DEBUG_TRAMPOLINES("returning 0 in vmap_p4d_range_for_trampoline");
 	return 0;
 }
 
@@ -259,7 +258,7 @@ static int vmap_range_noflush_for_trampoline(unsigned long addr, unsigned long e
 		err = vmap_p4d_range_for_trampoline(pgd, addr, next, phys_addr, prot,
 					max_page_shift, &mask);
 		if (err)
-		TRACER_PRINT_DEBUG_TRAMPOLINES("error in inner vmap_range_noflush_for_trampoline 1: %i", err);
+		//TRACER_PRINT_DEBUG_TRAMPOLINES("error in inner vmap_range_noflush_for_trampoline 1: %i", err);
 			break;
 	} while (pgd++, phys_addr += (next - addr), addr = next, addr != end);
 
@@ -267,7 +266,7 @@ static int vmap_range_noflush_for_trampoline(unsigned long addr, unsigned long e
 		arch_sync_kernel_mappings(start, end);
 
 	
-	TRACER_PRINT_DEBUG_TRAMPOLINES("returning %i from vmap_range_no_flush_for_trampoline", err);
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("returning %i from vmap_range_no_flush_for_trampoline", err);
 
 	return err;
 }
@@ -279,10 +278,10 @@ int vmap_page_range_for_trampoline(unsigned long addr, unsigned long end,
 
 	err = vmap_range_noflush_for_trampoline(addr, end, phys_addr, pgprot_nx(prot),
 				 ioremap_max_page_shift);
-	TRACER_PRINT_DEBUG_TRAMPOLINES("Error is %i", err);
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("Error is %i", err);
 	flush_cache_vmap(addr, end);
 	if (err ) {
-	TRACER_PRINT_DEBUG_TRAMPOLINES("got an error in vmap_page_range_for_tramp, %i", err);
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("got an error in vmap_page_range_for_tramp, %i", err);
 
 	}
 	if (!err) {
@@ -291,7 +290,7 @@ int vmap_page_range_for_trampoline(unsigned long addr, unsigned long end,
 	}
 	if (err) {
 
-	TRACER_PRINT_DEBUG_TRAMPOLINES("error in vmap_page_range_for_tramp, %i", err);
+	//TRACER_PRINT_DEBUG_TRAMPOLINES("error in vmap_page_range_for_tramp, %i", err);
 	}
 	return err;
 }

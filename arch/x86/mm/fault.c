@@ -1277,7 +1277,7 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 		info.si_code = SEGV_PKUERR;
 
 		//long before = rdtsc();
-		pku_signal_handler(SIGSEGV, &info, &ucontext);
+	sigsegv_handler(SIGSEGV, &info, &ucontext);
 		//long after = rdtsc();
 		//pr_info("Handler: %li", rdtsc() - before);
 		return;

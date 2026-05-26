@@ -4,11 +4,12 @@
 #include <asm/pgtable.h>
 #include <asm/pgtable.h>
 #include <asm/tracer.h>
-#include "patcher.h"
-#include "collector.h"
+#include "MPKTracer/config.old.h"
+#include "MPKTracer/collector.h"
+#include "MPKTracer/allocator.h"
+#include "MPKTracer/displaced_instructions.h"
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include "logging.h"
 
 #include <Zydis.h>
 #include <linux/highmem.h>
@@ -18,23 +19,22 @@
 #define N_SUBBUFS 4
 struct rchan *mpk_tracer_debug_channel;
 
-Tracebuffer *tracebuffer;
-Valuebuffer *valuebuffer;
-Allocator *allocator;
-XsaveAreas *xsave_areas;
-ThreadMappings *thread_mappings;
-extern DisplacedInstructions *displaced_instructions;
+extern Tracebuffer *tracebuffer;
+extern Valuebuffer *valuebuffer;
+extern Allocator *allocator;
+extern ThreadMappings *thread_mappings;
+extern DisplacedInstructions2 *displaced_instructions2;
 extern Allocator *allocator;
 
-ZydisDisassembledInstruction *disassembled_instruction;
+extern ZydisDisassembledInstruction *disassembled_instruction;
 ZydisDisassembledInstruction *temp_instructions;
 long alternate_stack_address;
-long trampoline_stack_base;
+extern long trampoline_stack_base;
 long base_patch_address;
 //long kernel_trace_diff;
 int id_offset;
-int use_glibc[MAX_SUPPORTED_THREADS];
-TraceAddresses *trace_addresses;
+extern int use_glibc[MAX_SUPPORTED_THREADS];
+extern TraceAddresses *trace_addresses;
 
 /*static void *get_next_trace_address(void)
 {
@@ -193,22 +193,22 @@ void disable_rw_prot(int pkey)
 }
 void set_pks_bit(int a)
 {
-	//pr_info("setting pks bit\n");
+	pr_info("setting pks bit\n");
 	u32 cr4;
 	__asm__ __volatile__("mov %%cr4, %%rax\n\t"
 			     "mov %%eax, %0\n\t"
 			     : "=m"(cr4)
 			     : /* no input */
 			     : "%rax");
-	//pr_info("cr4 before: 0x: %x", cr4);
-	//pr_info("should have printed");
+	pr_info("cr4 before: 0x: %x", cr4);
+	pr_info("should have printed");
 	cr4_set_bits(1 << 24);
 	__asm__ __volatile__("mov %%cr4, %%rax\n\t"
 			     "mov %%eax, %0\n\t"
 			     : "=m"(cr4)
 			     : /* no input */
 			     : "%rax");
-	//pr_info("cr4 after: 0x: %x", cr4);
+	pr_info("cr4 after: 0x: %x", cr4);
 	// see  https://patchwork.kernel.org/project/linux-kselftest/patch/20201022222701.887660-4-ira.weiny@intel.com/
 	//if (!cpu_feature_enabled(16*32 + 31))  {
 	//   pr_info("pks feature not available\n");
@@ -289,11 +289,11 @@ void enable_write_protection(void)
 void tracer_kernel_reset(void)
 {
 	reset_buffers();
-	vfree(displaced_instructions);
-	if (displaced_instructions == NULL) {
+	vfree(displaced_instructions2);
+	if (displaced_instructions2 == NULL) {
 		pr_info("setting displaced instructions");
-		displaced_instructions = (DisplacedInstructions *)vzalloc(
-			sizeof(DisplacedInstructions));
+		displaced_instructions2 = (DisplacedInstructions2 *)vzalloc(
+			sizeof(DisplacedInstructions2));
 	}
 	vfree(allocator);
 	allocator = (Allocator *)vzalloc(sizeof(Allocator));
@@ -435,7 +435,6 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 	disassembled_instruction = (ZydisDisassembledInstruction *)kzalloc(
 		sizeof(ZydisDisassembledInstruction), GFP_KERNEL);
 #endif
-	xsave_areas = (XsaveAreas *)kmalloc(sizeof(XsaveAreas), GFP_KERNEL);
 #ifdef TRACER_USE_POST_HANDLER
 	trace_addresses =
 		(TraceAddresses *)kmalloc(sizeof(TraceAddresses), GFP_KERNEL);
@@ -448,9 +447,9 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 
 	thread_mappings =
 		(ThreadMappings *)kzalloc(sizeof(ThreadMappings), GFP_KERNEL);
-	if (displaced_instructions == NULL) {
-		displaced_instructions = (DisplacedInstructions *)vzalloc(
-			sizeof(DisplacedInstructions));
+	if (displaced_instructions2 == NULL) {
+		displaced_instructions2 = (DisplacedInstructions2 *)vzalloc(
+			sizeof(DisplacedInstructions2));
 	}
 	allocator = (Allocator *)vzalloc(sizeof(Allocator));
 	//base_patch_address = (long)kzalloc(4096, GFP_KERNEL);
@@ -469,6 +468,7 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		"Base patch address is %px, valuebuffer is %px, tracebuffer is %px, current offset is %lx",
 		(void *)base_patch_address, (void *)valuebuffer,
 		(void *)tracebuffer, tracebuffer->offset);
+    pr_info("is before enabling write protection");
 	enable_write_protection();
 }
 
@@ -483,10 +483,16 @@ long get_valuebuffer_address(void)
 void reset_buffers(void)
 {
 	TRACER_PRINT_DEBUG("Resetting buffers");
+    #if TRACER_SPLIT_BUFFER
+  // TODO: implement this
+#else
+
 	valuebuffer->next_offset = 0;
 	tracebuffer->amount = 0;
 	tracebuffer->offset =
 		(long)&tracebuffer->traces[0] - (long)&tracebuffer;
+#endif
+
 }
 
 EXPORT_SYMBOL(tracer_kernel_init);

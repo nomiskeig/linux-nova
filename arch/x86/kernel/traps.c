@@ -266,7 +266,7 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 {
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
 
-	//pr_info("is in do_error_trap with error code %li", error_code);
+	pr_info("is in do_error_trap with error code %li", error_code);
 	/*
 	 * WARN*()s end up here; fix them up before we call the
 	 * notifier chain.
@@ -283,10 +283,12 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 		if (*address == 0x0F && *(address + 1) == 0x0B) {
 			// official trap, do nothing
 		} else {
+
 			if (tracer_can_handle(address)) {
-				invalid_instr_signal_handler(0, &info,
+			  sigill_handler(0, &info,
 							     &ucontext);
 			} else {
+              pr_info("tracer cant handle");
 				if (*address == 0xD5) {
 					// one of our traps
 					regs->ip += 2;
