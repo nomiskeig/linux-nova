@@ -298,6 +298,7 @@ ENTRY(__copy_user_nocache)
 .L_finish_copy:
 	xorl %eax,%eax
 	ASM_CLAC
+	.byte 0xD5, 0xEA
 	sfence
 	ret
 
@@ -315,6 +316,7 @@ ENTRY(__copy_user_nocache)
 .L_fixup_1b_copy:
 	movl %ecx,%edx
 .L_fixup_handle_tail:
+	.byte 0xD5, 0xEA
 	sfence
 	jmp copy_user_handle_tail
 	.previous
