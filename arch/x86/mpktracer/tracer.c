@@ -4,6 +4,8 @@
 #include <asm/pgtable.h>
 #include <asm/pgtable.h>
 #include <asm/tracer.h>
+#include <linux/mm.h>
+#include <linux/io.h>
 #include "MPKTracer/config.old.h"
 #include "MPKTracer/collector.h"
 #include "MPKTracer/allocator.h"
@@ -208,7 +210,7 @@ void set_pks_bit(int a)
 			     : "=m"(cr4)
 			     : /* no input */
 			     : "%rax");
-	pr_info("cr4 after: 0x: %x", cr4);
+	pr_info("cr4 after: 0x: %x, bit 24 is %i", cr4, cr4 & (1 << 24));
 	// see  https://patchwork.kernel.org/project/linux-kselftest/patch/20201022222701.887660-4-ira.weiny@intel.com/
 	//if (!cpu_feature_enabled(16*32 + 31))  {
 	//   pr_info("pks feature not available\n");
@@ -362,15 +364,21 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		vmalloc(amount_pages_trace * sizeof(struct page *));
 	struct page **page_pointer_valuebuffer =
 		vmalloc(amount_pages_value * sizeof(struct page *));
+	/*
 	long res_get_user =
 		get_user_pages_unlocked(trace_buffer_address,
 					amount_pages_trace,
 					page_pointer_tracebuffer, 0);
+					*/
+	// base_pyhsical_address_tracebuffer is the phyical address in /proc/iomem of pci device 00000:00:06.0 which we provide qemu as a ivshmem_plain device
+	long pyhsical_address_tracebuffer = 0x38000000000;
+	/*
 	for (int i = 0; i < amount_pages_trace; i++) {
 		if (page_pointer_tracebuffer[i] == NULL) {
 			pr_err("Page %i is zero pointer", i);
 		}
 	}
+	*/
 	get_user_pages_unlocked(value_buffer_address, amount_pages_value,
 				page_pointer_valuebuffer, 0);
 	for (int i = 0; i < amount_pages_value; i++) {
@@ -379,11 +387,13 @@ void tracer_kernel_init(unsigned long trace_buffer_address,
 		}
 	}
 	flush_tlb_all();
-	tracebuffer = vmap(page_pointer_tracebuffer, amount_pages_trace,
-			   VM_READ | VM_WRITE | VM_READ, PAGE_KERNEL);
+	tracebuffer = memremap(pyhsical_address_tracebuffer, sizeof(Tracebuffer), MEMREMAP_WC);
+	/*tracebuffer = vmap(page_pointer_tracebuffer, amount_pages_trace,
+			   VM_READ | VM_WRITE | VM_READ, PAGE_KERNEL);*/
 	if (tracebuffer == NULL) {
-		pr_err("could not map the tracebuffer, could only map %li pages of %i",
-		       res_get_user, amount_pages_trace);
+		pr_err("tracebuffer is not mapped");
+		/*pr_err("could not map the tracebuffer, could only map %li pages of %i",
+		       res_get_user, amount_pages_trace);*/
 	}
 	valuebuffer = vmap(page_pointer_valuebuffer, amount_pages_value,
 			   VM_READ | VM_WRITE, PAGE_KERNEL);
