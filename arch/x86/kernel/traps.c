@@ -266,7 +266,6 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 {
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
 
-	pr_info("is in do_error_trap with error code %li", error_code);
 	/*
 	 * WARN*()s end up here; fix them up before we call the
 	 * notifier chain.
@@ -284,11 +283,11 @@ static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
 			// official trap, do nothing
 		} else {
 
+
 			if (tracer_can_handle(address)) {
 			  sigill_handler(0, &info,
 							     &ucontext);
 			} else {
-              pr_info("tracer cant handle");
 				if (*address == 0xD5) {
 					// one of our traps
 					regs->ip += 2;
@@ -339,8 +338,9 @@ __visible void __noreturn handle_stack_overflow(const char *message,
 						struct pt_regs *regs,
 						unsigned long fault_address)
 {
+	dump_stack();
 	printk(KERN_EMERG
-	       "BUG: stack guard page was hit at %p (stack is %p..%p)\n",
+	       "BUG: stack guard page was hit at %lx (stack is %lx..%lx)\n",
 	       (void *)fault_address, current->stack,
 	       (char *)current->stack + THREAD_SIZE - 1);
 	die(message, regs, 0);

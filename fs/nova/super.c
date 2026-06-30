@@ -717,7 +717,8 @@ static int nova_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* Init a new nova instance */
 	if (sbi->s_mount_opt & NOVA_MOUNT_FORMAT) {
-		root_pi = nova_init(sb, sbi->initsize);
+		root_pi = nova_init(sb, 5242880);
+		//root_pi = nova_init(sb, sbi->initsize);
 		retval = -ENOMEM;
 		if (IS_ERR(root_pi)) {
 			nova_err(sb, "%s: root_pi error.",
