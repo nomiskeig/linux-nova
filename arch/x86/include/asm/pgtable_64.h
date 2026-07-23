@@ -72,10 +72,10 @@ static inline void native_set_pte(pte_t *ptep, pte_t pte)
 	unsigned long physical_address = pte_pfn(pte) << PAGE_SHIFT;
 	if (physical_address >= PMEM_START &&
 
-	    physical_address < (PMEM_START + PMEM_LEN)) {
+	    physical_address <= (PMEM_START + PMEM_LEN)) {
 		pte = (pte_t){ .pte = (long)(pte.pte |
 					     (1l << _PAGE_BIT_PKEY_BIT0)) };
-		pr_info("protected memory at %lx", physical_address);
+		pr_info("protected memory at  with pte%lx, config page tables: %i", physical_address, CONFIG_PGTABLE_LEVELS);
 	}
 	WRITE_ONCE(*ptep, pte);
 }
@@ -94,15 +94,16 @@ static inline void native_set_pte_atomic(pte_t *ptep, pte_t pte)
 static inline void native_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	// this seems to do absolutly nothing, which is sad becuase i dont know where stuff is mapped then
-	/*unsigned long physical_address = pmd_pfn(pmd) << PAGE_SHIFT;
-	if (physical_address >= (1l << 34) &&
+	unsigned long physical_address = pmd_pfn(pmd) << PAGE_SHIFT;
 
-	    physical_address < ((1l << 34) + (1l << 32))) {
+	//pr_info("setting native pmd at addres %lx", physical_address);
+	if (physical_address >= PMEM_START &&
+
+	    physical_address < (PMEM_START + PMEM_LEN)) {
 		pmd = (pmd_t){ .pmd = (long)(pmd.pmd |
 					     (1l << _PAGE_BIT_PKEY_BIT0)) };
 		pr_info("protected memory at %lx via pmd entry", physical_address);
 	}
-	*/
 	WRITE_ONCE(*pmdp, pmd);
 }
 
