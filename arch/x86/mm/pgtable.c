@@ -757,6 +757,13 @@ int pmd_set_huge(pmd_t *pmd, phys_addr_t addr, pgprot_t prot)
 
 	prot = pgprot_4k_2_large(prot);
 
+
+	if (addr >= PMEM_START &&
+	    addr < (PMEM_START + PMEM_LEN)) {
+		// return here, hopefully that means we do not use huge pages for our memory as it seems broken
+		return 0;
+
+	}
 	set_pte((pte_t *)pmd, pfn_pte(
 		(u64)addr >> PAGE_SHIFT,
 		__pgprot(pgprot_val(prot) | _PAGE_PSE)));
