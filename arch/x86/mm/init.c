@@ -339,10 +339,19 @@ static int __meminit split_mem_range(struct map_range *mr, int nr_range,
 	unsigned long pfn;
 	int i;
 
+	pfn = start_pfn = PFN_DOWN(start);
+	end_pfn = PFN_DOWN(end);
+	if (start >= PMEM_START && end <= PMEM_START + (1l << 30)) {
+		pr_info("splitting mem_range of our memory");
+		start_pfn = PFN_DOWN(start);
+		nr_range = save_mr(mr, nr_range, start,end_pfn, 0);
+		pfn = end_pfn;
+
+	}
+
 	limit_pfn = PFN_DOWN(end);
 
 	/* head if not big page alignment ? */
-	pfn = start_pfn = PFN_DOWN(start);
 #ifdef CONFIG_X86_32
 	/*
 	 * Don't use a large page for the first 2/4MB of memory
